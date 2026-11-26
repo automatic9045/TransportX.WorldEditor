@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TransportX.WorldEditor.Views.Dialogs.ImportWorldDialogWindow"
+        Title="Editor非対応ワールドをインポート"
+        Width="600"
+        Height="430"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid RowDefinitions="*,Auto" Margin="16" RowSpacing="12">
+        <StackPanel Grid.Row="0" Spacing="10">
+            <TextBlock Text="既存の TransportX スクリプト（WorldInfo XML または World.csx）を読み込み、GUIエディタ対応形式として別フォルダに新規プロジェクトを構築して開きます。"
+                       TextWrapping="Wrap"
+                       Opacity="0.85" />
+
+            <Grid ColumnDefinitions="145,*,Auto"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                  RowSpacing="8"
+                  ColumnSpacing="8">
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="インポート元 (.xml / .csx)" />
+                <TextBox x:Name="SourcePathBox" Grid.Row="0" Grid.Column="1" Watermark="例: D:\...\Automatic9045.BasicSample.xml" />
+                <Button x:Name="BrowseSourceButton" Grid.Row="0" Grid.Column="2" Content="参照..." Click="OnBrowseSourceClicked" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="出力先親フォルダ" />
+                <TextBox x:Name="DestParentDirBox" Grid.Row="1" Grid.Column="1" Watermark="例: D:\Worlds" />
+                <Button x:Name="BrowseDestButton" Grid.Row="1" Grid.Column="2" Content="参照..." Click="OnBrowseDestClicked" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="著者名 (Author)" />
+                <TextBox x:Name="AuthorBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Text="ImportedAuthor" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="フォルダ名 (Key)" />
+                <TextBox x:Name="WorldKeyBox" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Text="ImportedWorld" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="タイトル (Title)" />
+                <TextBox x:Name="TitleBox" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" />
+
+                <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="説明" />
+                <TextBox x:Name="DescriptionBox" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" />
+            </Grid>
+
+            <CheckBox x:Name="CopyAssetsCheckBox"
+                      Content="アセット（モデル・テクスチャ・CrossSection・LaneLayout・環境XML等）を出力先へコピーする"
+                      IsChecked="True" />
+
+            <Border Background="#1F242D"
+                    BorderBrush="#333B4A"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="8">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="OutputPreviewText"
+                               FontSize="11.5"
+                               Opacity="0.85"
+                               TextWrapping="Wrap" />
+                    <TextBlock x:Name="ValidationMessageText"
+                               FontSize="11.5"
+                               Foreground="#F87171"
+                               TextWrapping="Wrap"
+                               IsVisible="False" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="ImportButton"
+                    Content="インポートして開く"
+                    IsDefault="True"
+                    IsEnabled="False"
+                    Click="OnImportClicked" />
+            <Button Content="キャンセル"
+                    IsCancel="True"
+                    Click="OnCancelClicked" />
+        </StackPanel>
+    </Grid>
+</Window>

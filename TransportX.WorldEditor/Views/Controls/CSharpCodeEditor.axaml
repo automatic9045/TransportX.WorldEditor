@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ae="using:AvaloniaEdit"
+             x:Class="TransportX.WorldEditor.Views.Controls.CSharpCodeEditor">
+  <Border Background="#1E1E1E"
+          BorderBrush="#3F3F46"
+          BorderThickness="1"
+          CornerRadius="3">
+    <Grid>
+      <ae:TextEditor x:Name="Editor"
+                     Background="Transparent"
+                     Foreground="#D4D4D4"
+                     FontFamily="MS Gothic"
+                     FontSize="12"
+                     ShowLineNumbers="True"
+                     HorizontalScrollBarVisibility="Auto"
+                     VerticalScrollBarVisibility="Auto"
+                     Padding="4,4" />
+      <TextBlock x:Name="WatermarkTextBlock"
+                 IsHitTestVisible="False"
+                 Margin="40,5,6,4"
+                 FontFamily="MS Gothic"
+                 FontSize="12"
+                 Foreground="#7F8694"
+                 TextWrapping="Wrap" />
+    </Grid>
+  </Border>
+</UserControl>

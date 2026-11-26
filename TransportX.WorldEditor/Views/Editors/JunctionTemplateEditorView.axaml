@@ -1,0 +1,604 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             xmlns:controls="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Editors.JunctionTemplateEditorView"
+             x:DataType="vm:JunctionTemplateEditorDocumentViewModel">
+  <UserControl.Styles>
+    <Style Selector="TabControl.compact-subtabs TabItem">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="28" />
+    </Style>
+    <Style Selector="ToggleButton.preview-mode-toggle">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="Background" Value="#252A34" />
+      <Setter Property="BorderBrush" Value="#3E4554" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#D6DCE8" />
+    </Style>
+    <Style Selector="ToggleButton.preview-mode-toggle:checked">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ToggleButton.preview-mode-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="8" RowSpacing="6">
+    <!-- Header -->
+    <Border Grid.Row="0"
+            Background="#1D222B"
+            BorderBrush="#313744"
+            BorderThickness="1"
+            CornerRadius="4"
+            Padding="10,6">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <TextBlock Text="JunctionTemplate:" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding TemplateKey}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding RelativePath.Value}" Opacity="0.65" FontSize="12" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Warning Banner -->
+    <Border Grid.Row="1"
+            Background="#5A2525"
+            CornerRadius="4"
+            Padding="10,6"
+            IsVisible="{Binding HasWarningBanner.Value}">
+      <TextBlock Text="{Binding WarningBannerText.Value}"
+                 Foreground="#FFD6D6"
+                 TextWrapping="Wrap"
+                 FontSize="12" />
+    </Border>
+
+    <!-- Split Canvas + Multi-Tab Inspector -->
+    <Grid Grid.Row="2" ColumnDefinitions="1*,6,1.35*">
+      <!-- Left: 2D Plan / 3D Offscreen Preview Toggle Pane -->
+      <Border Grid.Column="0"
+              BorderBrush="#313744"
+              BorderThickness="1"
+              CornerRadius="4"
+              Background="#14181F">
+        <Grid RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Background="#1D222B" Padding="8,4" BorderBrush="#313744" BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <ToggleButton Classes="preview-mode-toggle"
+                              Content="2D 平面図"
+                              IsChecked="{Binding !Is3DPreviewMode.Value, Mode=OneWay}"
+                              Command="{Binding SwitchTo2DPreviewCommand}" />
+                <ToggleButton Classes="preview-mode-toggle"
+                              Content="3D プレビュー"
+                              IsChecked="{Binding Is3DPreviewMode.Value, Mode=OneWay}"
+                              Command="{Binding SwitchTo3DPreviewCommand}" />
+              </StackPanel>
+
+              <TextBlock Grid.Column="1"
+                         VerticalAlignment="Center"
+                         FontSize="11"
+                         Opacity="0.8"
+                         TextTrimming="CharacterEllipsis"
+                         IsVisible="{Binding !Is3DPreviewMode.Value}"
+                         Text="左ドラッグ: Port/Relay移動 (Shift:0.1m) | 右/中ドラッグ: パン | ホイール: ズーム" />
+              <TextBlock Grid.Column="1"
+                         VerticalAlignment="Center"
+                         FontSize="11"
+                         Opacity="0.8"
+                         TextTrimming="CharacterEllipsis"
+                         IsVisible="{Binding Is3DPreviewMode.Value}"
+                         Text="左/右ドラッグ: 回転 | 中・Shift+左ドラッグ: パン | ホイール: ズーム" />
+
+              <StackPanel Grid.Column="2"
+                          Orientation="Horizontal"
+                          Spacing="6"
+                          VerticalAlignment="Center"
+                          IsVisible="{Binding Is3DPreviewMode.Value}">
+                <CheckBox Content="ネット"
+                          FontSize="11"
+                          IsChecked="{Binding Show3DNetworkOverlay.Value, Mode=TwoWay}" />
+                <Button Content="視点リセット"
+                        FontSize="11"
+                        Padding="7,2"
+                        Command="{Binding Reset3DPreviewCameraCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <controls:JunctionPlanCanvas Grid.Row="1"
+                                       IsVisible="{Binding !Is3DPreviewMode.Value}" />
+          <controls:JunctionPreview3DView Grid.Row="1"
+                                          IsVisible="{Binding Is3DPreviewMode.Value}" />
+        </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Background="#252A34" ResizeDirection="Columns" />
+
+      <!-- Right: Editor Tabs -->
+      <TabControl Grid.Column="2"
+                  Classes="compact-subtabs"
+                  SelectedIndex="{Binding SelectedEditorTabIndex.Value, Mode=TwoWay}"
+                  IsEnabled="{Binding IsEditable.Value}">
+        <!-- 1. Ports Tab -->
+        <TabItem Header="ポート">
+          <Grid RowDefinitions="Auto,*" RowSpacing="6" Margin="0,6,0,0">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+              <Button Content="+ Port" Command="{Binding AddPortCommand}" />
+              <Button Content="上へ" Command="{Binding MovePortUpCommand}" />
+              <Button Content="下へ" Command="{Binding MovePortDownCommand}" />
+              <Button Content="削除" Command="{Binding RemovePortCommand}" />
+            </StackPanel>
+
+            <Grid Grid.Row="1" ColumnDefinitions="1*,1.2*" ColumnSpacing="8">
+              <ListBox Grid.Column="0" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort.Value, Mode=TwoWay}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:JunctionPortRow">
+                    <TextBlock Text="{Binding Summary}" FontSize="12" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <ScrollViewer Grid.Column="1" IsEnabled="{Binding HasSelectedPort.Value}">
+                <StackPanel Spacing="6" Margin="4">
+                  <TextBlock Text="Port Key" FontSize="12" />
+                  <TextBox Text="{Binding PortKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                  <TextBlock Text="LaneLayoutKey" FontSize="12" />
+                  <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableLaneLayoutKeys}" SelectedItem="{Binding PortLayoutKey.Value, Mode=TwoWay}" />
+                  <TextBlock Text="ローカル座標 (X, Y, Z)" FontSize="12" />
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding PortX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding PortY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding PortZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <TextBlock Text="回転角 (° RotationX, RotationY, RotationZ)" FontSize="12" />
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding PortRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding PortRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding PortRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                  </Grid>
+                </StackPanel>
+              </ScrollViewer>
+            </Grid>
+          </Grid>
+        </TabItem>
+
+        <!-- 2. Relays Tab -->
+        <TabItem Header="中継 (Relay)">
+          <Grid RowDefinitions="Auto,*" RowSpacing="6" Margin="0,6,0,0">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+              <Button Content="+ Relay" Command="{Binding AddRelayCommand}" />
+              <Button Content="削除" Command="{Binding RemoveRelayCommand}" />
+            </StackPanel>
+
+            <Grid Grid.Row="1" ColumnDefinitions="1*,1.2*" ColumnSpacing="8">
+              <ListBox Grid.Column="0" ItemsSource="{Binding Relays}" SelectedItem="{Binding SelectedRelay.Value, Mode=TwoWay}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:JunctionRelayRow">
+                    <TextBlock Text="{Binding Summary}" FontSize="12" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <ScrollViewer Grid.Column="1" IsEnabled="{Binding HasSelectedRelay.Value}">
+                <StackPanel Spacing="6" Margin="4">
+                  <TextBlock Text="InputKey" FontSize="12" />
+                  <TextBox Text="{Binding RelayInputKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                  <TextBlock Text="OutputKey" FontSize="12" />
+                  <TextBox Text="{Binding RelayOutputKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                  <TextBlock Text="LaneLayoutKey" FontSize="12" />
+                  <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableLaneLayoutKeys}" SelectedItem="{Binding RelayLayoutKey.Value, Mode=TwoWay}" />
+                  <TextBlock Text="ローカル座標 (X, Y, Z)" FontSize="12" />
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding RelayX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding RelayY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding RelayZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <TextBlock Text="回転角 (° RotationX, RotationY, RotationZ)" FontSize="12" />
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding RelayRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding RelayRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding RelayRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                  </Grid>
+                </StackPanel>
+              </ScrollViewer>
+            </Grid>
+          </Grid>
+        </TabItem>
+
+        <!-- 3. Wired Paths (Wire) Tab -->
+        <TabItem Header="パス (Wire)">
+          <Grid RowDefinitions="Auto,120,*" RowSpacing="6" Margin="0,6,0,0">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+              <Button Content="+ Wire" Command="{Binding AddPathCommand}" />
+              <Button Content="削除" Command="{Binding RemovePathCommand}" />
+            </StackPanel>
+
+            <ListBox Grid.Row="1" ItemsSource="{Binding Paths}" SelectedItem="{Binding SelectedPath.Value, Mode=TwoWay}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:JunctionPathRow">
+                  <TextBlock Text="{Binding Summary}" FontSize="12" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <ScrollViewer Grid.Row="2" IsEnabled="{Binding HasSelectedPath.Value}">
+              <StackPanel Spacing="8" Margin="4">
+                <Grid ColumnDefinitions="90,*,70,*" ColumnSpacing="6" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Text="Path Key" VerticalAlignment="Center" FontSize="12" />
+                  <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding PathKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" Text="TrafficDens" VerticalAlignment="Center" FontSize="12" />
+                  <Grid Grid.Row="0" Grid.Column="3" ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                    <NumericUpDown Grid.Column="0" Value="{Binding PathTrafficDensityFactor.Value, Mode=TwoWay}" ShowButtonSpinner="False" FormatString="0.##" Minimum="0" Watermark="(未設定)" />
+                    <Button Grid.Column="1" Content="×" Padding="6,2" Command="{Binding ClearTrafficDensityCommand}" />
+                  </Grid>
+
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="From Port" VerticalAlignment="Center" FontSize="12" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePortKeys}" SelectedItem="{Binding PathFromPortKey.Value, Mode=TwoWay}" />
+                  <TextBlock Grid.Row="1" Grid.Column="2" Text="Pin" VerticalAlignment="Center" FontSize="12" />
+                  <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding PathFromPinIndex.Value, Mode=TwoWay}" Minimum="0" FormatString="0" ShowButtonSpinner="False" />
+
+                  <TextBlock Grid.Row="2" Grid.Column="0" Text="To Port" VerticalAlignment="Center" FontSize="12" />
+                  <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePortKeys}" SelectedItem="{Binding PathToPortKey.Value, Mode=TwoWay}" />
+                  <TextBlock Grid.Row="2" Grid.Column="2" Text="Pin" VerticalAlignment="Center" FontSize="12" />
+                  <NumericUpDown Grid.Row="2" Grid.Column="3" Value="{Binding PathToPinIndex.Value, Mode=TwoWay}" Minimum="0" FormatString="0" ShowButtonSpinner="False" />
+                </Grid>
+
+                <!-- Path Segments -->
+                <TextBlock Text="曲線セグメント (Segments)" FontWeight="SemiBold" FontSize="12" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="+ Seg" Padding="6,2" Command="{Binding AddPathSegmentCommand}" />
+                  <Button Content="削除" Padding="6,2" Command="{Binding RemovePathSegmentCommand}" />
+                </StackPanel>
+                <ListBox MaxHeight="90" ItemsSource="{Binding PathSegments}" SelectedItem="{Binding SelectedPathSegment.Value, Mode=TwoWay}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:JunctionSegmentRow">
+                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedPathSegment.Value}">
+                  <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding PathSegmentKinds}" SelectedItem="{Binding PathSegKind.Value, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Text="out var:" VerticalAlignment="Center" FontSize="11.5" />
+                    <TextBox Grid.Column="2" Text="{Binding PathSegAnchorId.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="例: s1" />
+                  </Grid>
+                  <StackPanel IsVisible="{Binding PathSegHasTargetPose.Value}" Spacing="4">
+                    <Grid ColumnDefinitions="*,4,*,4,*">
+                      <NumericUpDown Grid.Column="0" Value="{Binding PathSegX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                      <NumericUpDown Grid.Column="2" Value="{Binding PathSegY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                      <NumericUpDown Grid.Column="4" Value="{Binding PathSegZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,4,*,4,*">
+                      <NumericUpDown Grid.Column="0" Value="{Binding PathSegRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                      <NumericUpDown Grid.Column="2" Value="{Binding PathSegRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                      <NumericUpDown Grid.Column="4" Value="{Binding PathSegRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    </Grid>
+                  </StackPanel>
+                  <Grid ColumnDefinitions="100,*" IsVisible="{Binding PathSegIsBezier.Value}">
+                    <TextBlock Grid.Column="0" Text="HandleScale" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding PathSegHandleScale.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Minimum="0.05" FormatString="0.##" ShowButtonSpinner="False" />
+                  </Grid>
+                </StackPanel>
+
+                <!-- Path Width -->
+                <TextBlock Text="レーン幅 (Width)" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="+ Width" Padding="6,2" Command="{Binding AddPathWidthCommand}" />
+                  <Button Content="削除" Padding="6,2" Command="{Binding RemovePathWidthCommand}" />
+                </StackPanel>
+                <ListBox MaxHeight="80" ItemsSource="{Binding PathWidths}" SelectedItem="{Binding SelectedPathWidth.Value, Mode=TwoWay}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:JunctionWidthRow">
+                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedPathWidth.Value}">
+                  <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding WidthSegmentKinds}" SelectedItem="{Binding WidthKind.Value, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Text="out var:" VerticalAlignment="Center" FontSize="11.5" />
+                    <TextBox Grid.Column="2" Text="{Binding WidthAnchorId.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6" IsVisible="{Binding WidthIsTransition.Value}">
+                    <TextBlock Grid.Column="0" Text="Left" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding WidthLeft.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <TextBlock Grid.Column="2" Text="Right" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="3" Value="{Binding WidthRight.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePathAnchorOptions}" SelectedItem="{Binding WidthLengthAnchor.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding WidthLengthOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                </StackPanel>
+
+                <!-- Path Extrusions & Props -->
+                <TextBlock Text="パス押し出し (PutExtrusion)" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="+ Extrusion" Padding="6,2" Command="{Binding AddPathExtrusionCommand}" />
+                  <Button Content="上へ" Padding="6,2" Command="{Binding MovePathExtrusionUpCommand}" />
+                  <Button Content="下へ" Padding="6,2" Command="{Binding MovePathExtrusionDownCommand}" />
+                  <Button Content="削除" Padding="6,2" Command="{Binding RemovePathExtrusionCommand}" />
+                </StackPanel>
+                <ListBox MaxHeight="80" ItemsSource="{Binding PathExtrusions}" SelectedItem="{Binding SelectedPathExtrusion.Value, Mode=TwoWay}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:JunctionRuleExtrusionRow">
+                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedPathExtrusion.Value}">
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCrossSectionKeys}" SelectedItem="{Binding PathExtCrossSectionKey.Value, Mode=TwoWay}" />
+                    <TextBox Grid.Column="1" Text="{Binding PathExtKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="Rule Key" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                    <TextBlock Grid.Column="0" Text="dx:" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding PathExtOffsetX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <TextBlock Grid.Column="2" Text="dy:" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="3" Value="{Binding PathExtOffsetY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+                    <TextBlock Grid.Column="0" Text="From:" VerticalAlignment="Center" FontSize="11.5" />
+                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePathAnchorOptions}" SelectedItem="{Binding PathExtFromAnchor.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding PathExtFromOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+                    <CheckBox Grid.Column="0" Content="To:" IsChecked="{Binding PathExtHasTo.Value, Mode=TwoWay}" FontSize="11.5" />
+                    <ComboBox Grid.Column="1" IsEnabled="{Binding PathExtHasTo.Value}" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePathAnchorOptions}" SelectedItem="{Binding PathExtToAnchor.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="2" IsEnabled="{Binding PathExtHasTo.Value}" Value="{Binding PathExtToOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                </StackPanel>
+
+                <TextBlock Text="パス反復プロップ (PutProp)" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="+ Prop" Padding="6,2" Command="{Binding AddPathPropCommand}" />
+                  <Button Content="上へ" Padding="6,2" Command="{Binding MovePathPropUpCommand}" />
+                  <Button Content="下へ" Padding="6,2" Command="{Binding MovePathPropDownCommand}" />
+                  <Button Content="削除" Padding="6,2" Command="{Binding RemovePathPropCommand}" />
+                </StackPanel>
+                <ListBox MaxHeight="80" ItemsSource="{Binding PathProps}" SelectedItem="{Binding SelectedPathProp.Value, Mode=TwoWay}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:JunctionRulePropRow">
+                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedPathProp.Value}">
+                  <TextBox Text="{Binding PathPropModelKeysText.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="ModelKeys (カンマ区切り)" />
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableModelKeys}" SelectedItem="{Binding PathPropModelToAdd.Value, Mode=TwoWay}" />
+                    <Button Grid.Column="1" Content="+ 追記" Padding="6,2" Command="{Binding AppendPathPropModelCommand}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePathAnchorOptions}" SelectedItem="{Binding PathPropFromAnchor.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding PathPropFromOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding PathPropSpan.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" Watermark="Span" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding PathPropInterval.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" Watermark="Interval" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding PathPropCount.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0" Minimum="0" Watermark="Count(0=∞)" />
+                  </Grid>
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </TabItem>
+
+        <!-- 4. Auxiliary Curves (AddCurve) Tab -->
+        <TabItem Header="補助曲線 (AddCurve)">
+          <Grid RowDefinitions="Auto,110,*" RowSpacing="6" Margin="0,6,0,0">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+              <Button Content="+ AddCurve" Command="{Binding AddCurveCommand}" />
+              <Button Content="削除" Command="{Binding RemoveCurveCommand}" />
+            </StackPanel>
+
+            <ListBox Grid.Row="1" ItemsSource="{Binding Curves}" SelectedItem="{Binding SelectedCurve.Value, Mode=TwoWay}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:JunctionCurveRow">
+                  <TextBlock Text="{Binding Summary}" FontSize="12" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <ScrollViewer Grid.Row="2" IsEnabled="{Binding HasSelectedCurve.Value}">
+              <StackPanel Spacing="8" Margin="4">
+                <Grid ColumnDefinitions="80,*,80,*" ColumnSpacing="6" RowDefinitions="Auto,Auto" RowSpacing="4">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Text="Curve Key" VerticalAlignment="Center" FontSize="12" />
+                  <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CurveKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" Text="Origin" VerticalAlignment="Center" FontSize="12" />
+                  <ComboBox Grid.Row="0" Grid.Column="3" HorizontalAlignment="Stretch" ItemsSource="{Binding CurveOriginKinds}" SelectedItem="{Binding CurveOriginKind.Value, Mode=TwoWay}" />
+                </Grid>
+
+                <StackPanel Spacing="4" IsVisible="{Binding CurveOriginIsPortPin.Value}">
+                  <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePortKeys}" SelectedItem="{Binding CurveOriginPortKey.Value, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Text="Pin:" VerticalAlignment="Center" FontSize="12" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding CurveOriginPinIndex.Value, Mode=TwoWay}" Minimum="0" FormatString="0" ShowButtonSpinner="False" />
+                    <CheckBox Grid.Column="3" Content="相対オフセット" IsChecked="{Binding CurveOriginHasOffset.Value, Mode=TwoWay}" FontSize="11.5" />
+                  </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding CurveOriginX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding CurveOriginY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding CurveOriginZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding CurveOriginRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding CurveOriginRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding CurveOriginRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                  </Grid>
+                </StackPanel>
+
+                <!-- Aux Curve Segments -->
+                <TextBlock Text="セグメント (StraightTo / BezierTo)" FontWeight="SemiBold" FontSize="12" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="+ Seg" Padding="6,2" Command="{Binding AddCurveSegmentCommand}" />
+                  <Button Content="削除" Padding="6,2" Command="{Binding RemoveCurveSegmentCommand}" />
+                </StackPanel>
+                <ListBox MaxHeight="85" ItemsSource="{Binding CurveSegments}" SelectedItem="{Binding SelectedCurveSegment.Value, Mode=TwoWay}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:JunctionSegmentRow">
+                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedCurveSegment.Value}">
+                  <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AuxSegmentKinds}" SelectedItem="{Binding CurveSegKind.Value, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="1" Text="out var:" VerticalAlignment="Center" FontSize="11.5" />
+                    <TextBox Grid.Column="2" Text="{Binding CurveSegAnchorId.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding CurveSegX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding CurveSegY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding CurveSegZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding CurveSegRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding CurveSegRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding CurveSegRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                  </Grid>
+                  <Grid ColumnDefinitions="100,*" IsVisible="{Binding CurveSegIsBezier.Value}">
+                    <TextBlock Grid.Column="0" Text="HandleScale" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding CurveSegHandleScale.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Minimum="0.05" FormatString="0.##" ShowButtonSpinner="False" />
+                  </Grid>
+                </StackPanel>
+
+                <!-- Aux Curve Extrusions (Crosswalks & Stop-lines) -->
+                <TextBlock Text="押し出し (横断歩道・停止線等 PutExtrusion)" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="+ Extrusion" Padding="6,2" Command="{Binding AddCurveExtrusionCommand}" />
+                  <Button Content="上へ" Padding="6,2" Command="{Binding MoveCurveExtrusionUpCommand}" />
+                  <Button Content="下へ" Padding="6,2" Command="{Binding MoveCurveExtrusionDownCommand}" />
+                  <Button Content="削除" Padding="6,2" Command="{Binding RemoveCurveExtrusionCommand}" />
+                </StackPanel>
+                <ListBox MaxHeight="85" ItemsSource="{Binding CurveExtrusions}" SelectedItem="{Binding SelectedCurveExtrusion.Value, Mode=TwoWay}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:JunctionRuleExtrusionRow">
+                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedCurveExtrusion.Value}">
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCrossSectionKeys}" SelectedItem="{Binding CurveExtCrossSectionKey.Value, Mode=TwoWay}" />
+                    <TextBox Grid.Column="1" Text="{Binding CurveExtKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="Rule Key" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                    <TextBlock Grid.Column="0" Text="dx:" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding CurveExtOffsetX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <TextBlock Grid.Column="2" Text="dy:" VerticalAlignment="Center" FontSize="11.5" />
+                    <NumericUpDown Grid.Column="3" Value="{Binding CurveExtOffsetY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+                    <TextBlock Grid.Column="0" Text="From:" VerticalAlignment="Center" FontSize="11.5" />
+                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurveAnchorOptions}" SelectedItem="{Binding CurveExtFromAnchor.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding CurveExtFromOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+                    <CheckBox Grid.Column="0" Content="To:" IsChecked="{Binding CurveExtHasTo.Value, Mode=TwoWay}" FontSize="11.5" />
+                    <ComboBox Grid.Column="1" IsEnabled="{Binding CurveExtHasTo.Value}" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurveAnchorOptions}" SelectedItem="{Binding CurveExtToAnchor.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="2" IsEnabled="{Binding CurveExtHasTo.Value}" Value="{Binding CurveExtToOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                </StackPanel>
+
+                <!-- Aux Curve Props -->
+                <TextBlock Text="反復プロップ (PutProp)" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="+ Prop" Padding="6,2" Command="{Binding AddCurvePropCommand}" />
+                  <Button Content="上へ" Padding="6,2" Command="{Binding MoveCurvePropUpCommand}" />
+                  <Button Content="下へ" Padding="6,2" Command="{Binding MoveCurvePropDownCommand}" />
+                  <Button Content="削除" Padding="6,2" Command="{Binding RemoveCurvePropCommand}" />
+                </StackPanel>
+                <ListBox MaxHeight="80" ItemsSource="{Binding CurveProps}" SelectedItem="{Binding SelectedCurveProp.Value, Mode=TwoWay}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:JunctionRulePropRow">
+                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedCurveProp.Value}">
+                  <TextBox Text="{Binding CurvePropModelKeysText.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="ModelKeys (カンマ区切り)" />
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableModelKeys}" SelectedItem="{Binding CurvePropModelToAdd.Value, Mode=TwoWay}" />
+                    <Button Grid.Column="1" Content="+ 追記" Padding="6,2" Command="{Binding AppendCurvePropModelCommand}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurveAnchorOptions}" SelectedItem="{Binding CurvePropFromAnchor.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding CurvePropFromOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding CurvePropSpan.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding CurvePropInterval.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding CurvePropCount.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0" Minimum="0" />
+                  </Grid>
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </TabItem>
+
+        <!-- 5. Static Props Tab -->
+        <TabItem Header="静的プロップ">
+          <Grid RowDefinitions="Auto,*" RowSpacing="6" Margin="0,6,0,0">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+              <Button Content="+ Prop" Command="{Binding AddStaticPropCommand}" />
+              <Button Content="上へ" Command="{Binding MoveStaticPropUpCommand}" />
+              <Button Content="下へ" Command="{Binding MoveStaticPropDownCommand}" />
+              <Button Content="削除" Command="{Binding RemoveStaticPropCommand}" />
+            </StackPanel>
+
+            <Grid Grid.Row="1" ColumnDefinitions="1*,1.1*" ColumnSpacing="8">
+              <ListBox Grid.Column="0" ItemsSource="{Binding StaticProps}" SelectedItem="{Binding SelectedStaticProp.Value, Mode=TwoWay}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:JunctionStaticPropRow">
+                    <TextBlock Text="{Binding Summary}" FontSize="12" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <ScrollViewer Grid.Column="1" IsEnabled="{Binding HasSelectedStaticProp.Value}">
+                <StackPanel Spacing="6" Margin="4">
+                  <TextBlock Text="ModelKey" FontSize="12" />
+                  <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableModelKeys}" SelectedItem="{Binding StaticPropModelKey.Value, Mode=TwoWay}" />
+                  <TextBlock Text="ローカル座標 (X, Y, Z)" FontSize="12" />
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding StaticPropX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding StaticPropY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding StaticPropZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
+                  </Grid>
+                  <TextBlock Text="回転角 (° RotationX, RotationY, RotationZ)" FontSize="12" />
+                  <Grid ColumnDefinitions="*,4,*,4,*">
+                    <NumericUpDown Grid.Column="0" Value="{Binding StaticPropRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding StaticPropRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                    <NumericUpDown Grid.Column="4" Value="{Binding StaticPropRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.##" />
+                  </Grid>
+                </StackPanel>
+              </ScrollViewer>
+            </Grid>
+          </Grid>
+        </TabItem>
+
+        <!-- 6. UserCode Tab -->
+        <TabItem Header="カスタムコード">
+          <Grid RowDefinitions="Auto,*" RowSpacing="6" Margin="0,6,0,0">
+            <TextBlock Grid.Row="0"
+                       FontSize="12"
+                       Opacity="0.8"
+                       TextWrapping="Wrap"
+                       Text="JunctionTemplate の // &lt;user-code&gt; (SignalController / Deflection / Signal / Yield / PutSignalProp 等) を編集します。" />
+            <controls:CSharpCodeEditor Grid.Row="1"
+                                       Text="{Binding UserCode.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                       IsReadOnly="{Binding IsProtected.Value}" />
+          </Grid>
+        </TabItem>
+      </TabControl>
+    </Grid>
+  </Grid>
+</UserControl>

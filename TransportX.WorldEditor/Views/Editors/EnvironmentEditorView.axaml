@@ -1,0 +1,106 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             x:Class="TransportX.WorldEditor.Views.Editors.EnvironmentEditorView"
+             x:DataType="vm:EnvironmentEditorDocumentViewModel">
+    <ScrollViewer>
+        <StackPanel Spacing="14" MaxWidth="820" Margin="16">
+            <Border Background="#20242C" BorderBrush="#313744" BorderThickness="1" CornerRadius="6" Padding="14">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="IBL (環境光マップ)" FontSize="15" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="拡散光マップ (Diffuse)" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding DiffuseTexturePath.Value, Mode=TwoWay}" Watermark="(既定)" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="反射光マップ (Specular)" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SpecularTexturePath.Value, Mode=TwoWay}" Watermark="(既定)" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="強度 (Intensity)" />
+                        <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,70" ColumnSpacing="8">
+                            <Slider Grid.Column="0" Minimum="0" Maximum="5" Value="{Binding IblIntensity.Value, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding IblIntensity.Value, StringFormat='{}{0:0.##}'}" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="彩度 (Saturation)" />
+                        <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,70" ColumnSpacing="8">
+                            <Slider Grid.Column="0" Minimum="0" Maximum="2" Value="{Binding IblSaturation.Value, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding IblSaturation.Value, StringFormat='{}{0:0.##}'}" />
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#20242C" BorderBrush="#313744" BorderThickness="1" CornerRadius="6" Padding="14">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Exposure (自動露出)" FontSize="15" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="基準輝度 (Key)" />
+                        <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding ExposureKey.Value, Mode=TwoWay}" Increment="0.01" Minimum="0.001" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="下限 (Min)" />
+                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ExposureMin.Value, Mode=TwoWay}" Increment="0.01" Minimum="0" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="上限 (Max)" />
+                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ExposureMax.Value, Mode=TwoWay}" Increment="0.5" Minimum="0.1" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="暗順応速度" />
+                        <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding DarkAdaptationSpeed.Value, Mode=TwoWay}" Increment="0.1" Minimum="0" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="明順応速度" />
+                        <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding LightAdaptationSpeed.Value, Mode=TwoWay}" Increment="0.1" Minimum="0" FormatString="0.###" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#20242C" BorderBrush="#313744" BorderThickness="1" CornerRadius="6" Padding="14">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="ToneMap (トーンマップ)" FontSize="15" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Contrast" />
+                        <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding ToneContrast.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Shoulder" />
+                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ToneShoulder.Value, Mode=TwoWay}" Increment="0.01" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="MaxLuminance" />
+                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ToneMaxLuminance.Value, Mode=TwoWay}" Increment="0.5" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="MidtoneScale" />
+                        <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding ToneMidtoneScale.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#20242C" BorderBrush="#313744" BorderThickness="1" CornerRadius="6" Padding="14">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Bloom (ブルーム)" FontSize="15" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Threshold" />
+                        <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding BloomThreshold.Value, Mode=TwoWay}" Increment="0.1" Minimum="0" FormatString="0.###" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Intensity" />
+                        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,70" ColumnSpacing="8">
+                            <Slider Grid.Column="0" Minimum="0" Maximum="3" Value="{Binding BloomIntensity.Value, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding BloomIntensity.Value, StringFormat='{}{0:0.##}'}" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Scatter" />
+                        <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,70" ColumnSpacing="8">
+                            <Slider Grid.Column="0" Minimum="0" Maximum="3" Value="{Binding BloomScatter.Value, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding BloomScatter.Value, StringFormat='{}{0:0.##}'}" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="SoftKnee" />
+                        <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,70" ColumnSpacing="8">
+                            <Slider Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding BloomSoftKnee.Value, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding BloomSoftKnee.Value, StringFormat='{}{0:0.##}'}" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Tint (#RRGGBB)" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding BloomTintHex.Value, Mode=TwoWay}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

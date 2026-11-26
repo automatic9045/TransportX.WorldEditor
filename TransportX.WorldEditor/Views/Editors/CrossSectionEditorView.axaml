@@ -1,0 +1,247 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             xmlns:net="using:TransportX.WorldEditor.Core.Models.Network"
+             xmlns:ctrl="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Editors.CrossSectionEditorView"
+             x:DataType="vm:CrossSectionEditorDocumentViewModel">
+    <Grid RowDefinitions="Auto,*" Margin="10" RowSpacing="8">
+        <Border Grid.Row="0"
+                Background="#5A2525"
+                CornerRadius="4"
+                Padding="10,6"
+                IsVisible="{Binding HasValidationBanner.Value}">
+            <TextBlock Text="{Binding ValidationBannerText.Value}" Foreground="#FFD6D6" TextWrapping="Wrap" FontSize="12" />
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="1.3*,1.1*" ColumnSpacing="12">
+            <Border Grid.Column="0" BorderBrush="#313744" BorderThickness="1" CornerRadius="4">
+                <ctrl:CrossSectionCanvas />
+            </Border>
+
+            <TabControl Grid.Column="1">
+                <TabItem Header="サーフェス (Surfaces)">
+                    <Grid RowDefinitions="Auto,120,*" RowSpacing="8" Margin="0,8,0,0">
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                            <Button Content="+ Surface追加" Command="{Binding AddSurfaceCommand}" />
+                            <Button Content="上へ" Command="{Binding MoveSurfaceUpCommand}" />
+                            <Button Content="下へ" Command="{Binding MoveSurfaceDownCommand}" />
+                            <Button Content="削除" Command="{Binding RemoveSurfaceCommand}" />
+                        </StackPanel>
+
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding Surfaces}"
+                                 SelectedItem="{Binding SelectedSurface.Value, Mode=TwoWay}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CrossSectionSurfaceRow">
+                                    <TextBlock Text="{Binding Summary}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <ScrollViewer Grid.Row="2" IsEnabled="{Binding HasSelectedSurface.Value}">
+                            <StackPanel Spacing="8" Margin="0,4">
+                                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Material" />
+                                    <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                                              ItemsSource="{Binding AvailableMaterialNames}"
+                                              SelectedItem="{Binding SurfaceMaterialName.Value, Mode=TwoWay}" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="ColliderMaterial" />
+                                    <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                                              ItemsSource="{Binding AvailableColliderMaterialOptions}"
+                                              SelectedItem="{Binding SurfaceColliderOption.Value, Mode=TwoWay}" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="VInterval" />
+                                    <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding SurfaceVInterval.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="VOffset" />
+                                    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding SurfaceVOffset.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+                                </Grid>
+
+                                <TextBlock Text="VertexRefs (順にポリライン接続):" FontWeight="SemiBold" />
+                                <ListBox ItemsSource="{Binding SelectedSurfaceVertexKeys}"
+                                         SelectedIndex="{Binding SelectedSurfaceVertexIndex.Value, Mode=TwoWay}"
+                                         Height="110" />
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch"
+                                              ItemsSource="{Binding AvailableVertexKeys}"
+                                              SelectedItem="{Binding VertexKeyToAdd.Value, Mode=TwoWay}" />
+                                    <Button Grid.Column="1" Content="頂点追加" Command="{Binding AddVertexRefToSurfaceCommand}" />
+                                    <Button Grid.Column="2" Content="削除" Command="{Binding RemoveVertexRefFromSurfaceCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="頂点 (Vertices)">
+                    <Grid RowDefinitions="Auto,140,*" RowSpacing="8" Margin="0,8,0,0">
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                            <Button Content="+ 頂点追加" Command="{Binding AddVertexCommand}" />
+                            <Button Content="上へ" Command="{Binding MoveVertexUpCommand}" />
+                            <Button Content="下へ" Command="{Binding MoveVertexDownCommand}" />
+                            <Button Content="法線を正規化" Command="{Binding NormalizeVertexNormalCommand}" />
+                            <Button Content="削除" Command="{Binding RemoveVertexCommand}" />
+                        </StackPanel>
+
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding Vertices}"
+                                 SelectedItem="{Binding SelectedVertex.Value, Mode=TwoWay}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CrossSectionVertexRow">
+                                    <TextBlock Text="{Binding Summary}" FontFamily="Consolas, Yu Gothic UI" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <ScrollViewer Grid.Row="2" IsEnabled="{Binding HasSelectedVertex.Value}">
+                            <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8">
+                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Key" />
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding VertexKey.Value, Mode=TwoWay}" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="X (m)" />
+                                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding VertexX.Value, Mode=TwoWay}" Increment="0.05" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Y (m)" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding VertexY.Value, Mode=TwoWay}" Increment="0.05" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="NormalX" />
+                                <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding NormalX.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="NormalY" />
+                                <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding NormalY.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Tex U" />
+                                <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding VertexU.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Color (#RRGGBB)" />
+                                <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding VertexColorHex.Value, Mode=TwoWay}" />
+                            </Grid>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="材質 (Materials)">
+                    <Grid RowDefinitions="Auto,110,*" RowSpacing="8" Margin="0,8,0,0">
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                            <Button Content="+ Material追加" Command="{Binding AddMaterialCommand}" />
+                            <Button Content="上へ" Command="{Binding MoveMaterialUpCommand}" />
+                            <Button Content="下へ" Command="{Binding MoveMaterialDownCommand}" />
+                            <Button Content="削除" Command="{Binding RemoveMaterialCommand}" />
+                        </StackPanel>
+
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding Materials}"
+                                 SelectedItem="{Binding SelectedMaterial.Value, Mode=TwoWay}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="net:CrossSectionMaterialModel">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <ScrollViewer Grid.Row="2" IsEnabled="{Binding HasSelectedMaterial.Value}">
+                            <StackPanel Spacing="6" Margin="0,4">
+                                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="材質名" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaterialName.Value, Mode=TwoWay}" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="BaseColor" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MaterialBaseColorHex.Value, Mode=TwoWay}" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Metallic" />
+                                    <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,92" ColumnSpacing="6">
+                                        <Slider Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding MaterialMetallic.Value, Mode=TwoWay}" />
+                                        <NumericUpDown Grid.Column="1" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.###" Value="{Binding MaterialMetallicNumeric.Value, Mode=TwoWay}" />
+                                    </Grid>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Roughness" />
+                                    <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,92" ColumnSpacing="6">
+                                        <Slider Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding MaterialRoughness.Value, Mode=TwoWay}" />
+                                        <NumericUpDown Grid.Column="1" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.###" Value="{Binding MaterialRoughnessNumeric.Value, Mode=TwoWay}" />
+                                    </Grid>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Emissive" />
+                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding MaterialEmissiveHex.Value, Mode=TwoWay}" />
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="EmissiveStrength" />
+                                    <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding MaterialEmissiveStrength.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.##" />
+                                </Grid>
+
+                                <TextBlock Text="テクスチャスロット" FontWeight="SemiBold" Margin="0,4,0,0" />
+                                <Grid ColumnDefinitions="90,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4" ColumnSpacing="4">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="BaseColor" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding BaseColorTexPath.Value, Mode=TwoWay}" />
+                                    <ComboBox Grid.Row="0" Grid.Column="2" ItemsSource="{Binding SampleModes}" SelectedItem="{Binding BaseColorTexMode.Value, Mode=TwoWay}" Width="88" />
+                                    <Button Grid.Row="0" Grid.Column="3" Content="..." Command="{Binding BrowseTextureCommand}" CommandParameter="BaseColor" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Normal" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NormalTexPath.Value, Mode=TwoWay}" />
+                                    <Button Grid.Row="1" Grid.Column="3" Content="..." Command="{Binding BrowseTextureCommand}" CommandParameter="Normal" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Occlusion" />
+                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding OcclusionTexPath.Value, Mode=TwoWay}" />
+                                    <Button Grid.Row="2" Grid.Column="3" Content="..." Command="{Binding BrowseTextureCommand}" CommandParameter="Occlusion" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Roughness" />
+                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding RoughnessTexPath.Value, Mode=TwoWay}" />
+                                    <Button Grid.Row="3" Grid.Column="3" Content="..." Command="{Binding BrowseTextureCommand}" CommandParameter="Roughness" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Metallic" />
+                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding MetallicTexPath.Value, Mode=TwoWay}" />
+                                    <Button Grid.Row="4" Grid.Column="3" Content="..." Command="{Binding BrowseTextureCommand}" CommandParameter="Metallic" />
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Emissive" />
+                                    <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding EmissiveTexPath.Value, Mode=TwoWay}" />
+                                    <ComboBox Grid.Row="5" Grid.Column="2" ItemsSource="{Binding SampleModes}" SelectedItem="{Binding EmissiveTexMode.Value, Mode=TwoWay}" Width="88" />
+                                    <Button Grid.Row="5" Grid.Column="3" Content="..." Command="{Binding BrowseTextureCommand}" CommandParameter="Emissive" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="物理材質 (Colliders)">
+                    <Grid RowDefinitions="Auto,110,*" RowSpacing="8" Margin="0,8,0,0">
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                            <Button Content="+ 物理材質追加" Command="{Binding AddColliderMaterialCommand}" />
+                            <Button Content="上へ" Command="{Binding MoveColliderMaterialUpCommand}" />
+                            <Button Content="下へ" Command="{Binding MoveColliderMaterialDownCommand}" />
+                            <Button Content="削除" Command="{Binding RemoveColliderMaterialCommand}" />
+                        </StackPanel>
+
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding ColliderMaterials}"
+                                 SelectedItem="{Binding SelectedColliderMaterial.Value, Mode=TwoWay}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="net:CrossSectionColliderMaterialModel">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <ScrollViewer Grid.Row="2" IsEnabled="{Binding HasSelectedColliderMaterial.Value}">
+                            <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8">
+                                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Name" />
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ColliderName.Value, Mode=TwoWay}" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="FrictionCoefficient" />
+                                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ColliderFriction.Value, Mode=TwoWay}" Increment="0.1" Minimum="0" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="MaxRecoveryVelocity" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ColliderMaxRecovery.Value, Mode=TwoWay}" Increment="1" Minimum="0" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="SpringFrequency" />
+                                <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding ColliderSpringFreq.Value, Mode=TwoWay}" Increment="1" Minimum="0" FormatString="0.###" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="SpringDampingRatio" />
+                                <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding ColliderSpringDamping.Value, Mode=TwoWay}" Increment="0.1" Minimum="0" FormatString="0.###" />
+                            </Grid>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</UserControl>

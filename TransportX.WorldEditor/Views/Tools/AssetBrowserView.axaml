@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dockvm="using:TransportX.WorldEditor.ViewModels.Dock"
+             x:Class="TransportX.WorldEditor.Views.Tools.AssetBrowserView"
+             x:DataType="dockvm:AssetBrowserToolViewModel">
+  <UserControl.Styles>
+    <Style Selector="TabStrip.compact-tabs TabStripItem">
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="ListBox.compact-assets ListBoxItem">
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="MinHeight" Value="20" />
+      <Setter Property="Margin" Value="0" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel Margin="4">
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,4">
+      <TextBox Watermark="{Binding NewKeyWatermark.Value}"
+               FontSize="12"
+               Text="{Binding NewResourceKey.Value, Mode=TwoWay}" />
+      <WrapPanel Orientation="Horizontal">
+        <Button Content="選択を開く" FontSize="11" Padding="8,3" Margin="0,0,4,2" Command="{Binding OpenSelectedCommand}" />
+        <Button Content="{Binding CreateButtonLabel.Value}"
+                FontSize="11"
+                Padding="8,3"
+                Margin="0,0,4,2"
+                IsVisible="{Binding CanCreateForActiveTab.Value}"
+                Command="{Binding CreateActiveResourceCommand}" />
+        <Button Content="既存ファイル読込"
+                FontSize="11"
+                Padding="8,3"
+                Margin="0,0,0,2"
+                IsVisible="{Binding CanImportForActiveTab.Value}"
+                Command="{Binding ImportExistingResourceCommand}" />
+      </WrapPanel>
+      <TabStrip Classes="compact-tabs"
+                SelectedIndex="{Binding SelectedTabIndex.Value, Mode=TwoWay}">
+        <TabStrip.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </TabStrip.ItemsPanel>
+        <TabStripItem Content="設定/環境" />
+        <TabStripItem Content="モデル" />
+        <TabStripItem Content="サウンド" />
+        <TabStripItem Content="進路" />
+        <TabStripItem Content="断面" />
+        <TabStripItem Content="スプライン" />
+        <TabStripItem Content="ジャンクション" />
+      </TabStrip>
+    </StackPanel>
+
+    <ListBox x:Name="AssetListBox"
+             Classes="compact-assets"
+             ItemsSource="{Binding ActiveTabItems}"
+             SelectedItem="{Binding SelectedItem.Value, Mode=TwoWay}"
+             DoubleTapped="OnAssetListDoubleTapped">
+      <ListBox.ContextMenu>
+        <ContextMenu>
+          <MenuItem Header="開く" Command="{Binding OpenSelectedCommand}" />
+          <Separator />
+          <MenuItem Header="削除"
+                    Command="{Binding DeleteSelectedCommand}"
+                    IsEnabled="{Binding CanDeleteSelected.Value}" />
+        </ContextMenu>
+      </ListBox.ContextMenu>
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="dockvm:AssetBrowserEntry">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" Margin="0">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding DisplayKey}"
+                       FontSize="12"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding RelativePath}"
+                       FontSize="11"
+                       Foreground="#8C96A6"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center" />
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </DockPanel>
+</UserControl>

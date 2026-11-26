@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="TransportX.WorldEditor.Core/TransportX.WorldEditor.Core.csproj" />
+  <Project Path="TransportX.WorldEditor.Serialization/TransportX.WorldEditor.Serialization.csproj" />
+  <Project Path="TransportX.WorldEditor.Rendering/TransportX.WorldEditor.Rendering.csproj" />
+  <Project Path="TransportX.WorldEditor/TransportX.WorldEditor.csproj" />
+  <Project Path="TransportX.WorldEditor.Tests/TransportX.WorldEditor.Tests.csproj" />
+</Solution>

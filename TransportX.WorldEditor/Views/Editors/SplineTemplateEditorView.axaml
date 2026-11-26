@@ -1,0 +1,280 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             xmlns:controls="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Editors.SplineTemplateEditorView"
+             x:DataType="vm:SplineTemplateEditorDocumentViewModel">
+    <UserControl.Styles>
+        <Style Selector="TabControl.compact-subtabs TabItem">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
+        <Style Selector="ToggleButton.preview-mode-toggle">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="Background" Value="#252A34" />
+            <Setter Property="BorderBrush" Value="#3E4554" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#D6DCE8" />
+        </Style>
+        <Style Selector="ToggleButton.preview-mode-toggle:checked">
+            <Setter Property="Background" Value="#0E639C" />
+            <Setter Property="BorderBrush" Value="#3794FF" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="ToggleButton.preview-mode-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#0E639C" />
+            <Setter Property="BorderBrush" Value="#3794FF" />
+        </Style>
+    </UserControl.Styles>
+    <Grid RowDefinitions="Auto,Auto,*" Margin="10" RowSpacing="8">
+        <!-- Header & Outlet Layout -->
+        <Border Grid.Row="0"
+                Background="#1D222B"
+                BorderBrush="#313744"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="10,8">
+            <Grid ColumnDefinitions="Auto,*,Auto,240" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Text="テンプレート:" VerticalAlignment="Center" Opacity="0.8" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TemplateKey}" FontWeight="SemiBold" FontSize="14" />
+                    <TextBlock Text="{Binding RelativePath.Value}" Opacity="0.65" VerticalAlignment="Center" FontSize="12" />
+                </StackPanel>
+
+                <TextBlock Grid.Column="2" Text="OutletLayout:" VerticalAlignment="Center" Opacity="0.85" />
+                <ComboBox Grid.Column="3"
+                          HorizontalAlignment="Stretch"
+                          IsEnabled="{Binding IsEditable.Value}"
+                          ItemsSource="{Binding AvailableLaneLayoutKeys}"
+                          SelectedItem="{Binding OutletLayoutKey.Value, Mode=TwoWay}" />
+            </Grid>
+        </Border>
+
+        <!-- Warning / Protection Banner -->
+        <Border Grid.Row="1"
+                Background="#5A2525"
+                CornerRadius="4"
+                Padding="10,6"
+                IsVisible="{Binding HasWarningBanner.Value}">
+            <TextBlock Text="{Binding WarningBannerText.Value}"
+                       Foreground="#FFD6D6"
+                       TextWrapping="Wrap"
+                       FontSize="12" />
+        </Border>
+
+        <!-- Split 3D Preview + Rules & UserCode Tabs -->
+        <Grid Grid.Row="2" ColumnDefinitions="1*,6,1.35*">
+            <Border Grid.Column="0"
+                    BorderBrush="#313744"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Background="#14181F">
+                <Grid RowDefinitions="Auto,*">
+                    <Border Grid.Row="0" Background="#1D222B" Padding="8,4" BorderBrush="#313744" BorderThickness="0,0,0,1">
+                        <StackPanel Spacing="3">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                    <TextBlock Text="3D プレビュー:" FontSize="11.5" Opacity="0.85" VerticalAlignment="Center" Margin="0,0,2,0" />
+                                    <ToggleButton Classes="preview-mode-toggle"
+                                                  Content="直線"
+                                                  IsChecked="{Binding !UseCurvedPreview.Value, Mode=OneWay}"
+                                                  Command="{Binding SetStraightPreviewCommand}" />
+                                    <ToggleButton Classes="preview-mode-toggle"
+                                                  Content="カーブ"
+                                                  IsChecked="{Binding UseCurvedPreview.Value, Mode=OneWay}"
+                                                  Command="{Binding SetCurvedPreviewCommand}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <CheckBox Content="ネット"
+                                              FontSize="11"
+                                              IsChecked="{Binding Show3DNetworkOverlay.Value, Mode=TwoWay}" />
+                                    <Button Content="視点リセット"
+                                            FontSize="11"
+                                            Padding="7,2"
+                                            Command="{Binding Reset3DPreviewCameraCommand}" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock FontSize="10.5"
+                                       Opacity="0.72"
+                                       TextTrimming="CharacterEllipsis"
+                                       Text="左/右ドラッグ: 回転 | 中・Shift+左ドラッグ: パン | ホイール: ズーム" />
+                        </StackPanel>
+                    </Border>
+                    <controls:SplinePreview3DView Grid.Row="1" />
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Background="#252A34" ResizeDirection="Columns" />
+
+            <!-- Rules & UserCode Tabs -->
+            <TabControl Grid.Column="2"
+                        Classes="compact-subtabs"
+                        IsEnabled="{Binding IsEditable.Value}">
+            <!-- Extrusions Tab -->
+            <TabItem Header="押し出し (Extrusions)">
+                <Grid RowDefinitions="Auto,120,*" RowSpacing="6" Margin="0,6,0,0">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                        <Button Content="+ 押し出し追加" Command="{Binding AddExtrusionCommand}" />
+                        <Button Content="上へ" Command="{Binding MoveExtrusionUpCommand}" />
+                        <Button Content="下へ" Command="{Binding MoveExtrusionDownCommand}" />
+                        <Button Content="削除" Command="{Binding RemoveExtrusionCommand}" />
+                    </StackPanel>
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Extrusions}"
+                             SelectedItem="{Binding SelectedExtrusion.Value, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SplineTemplateExtrusionRow">
+                                <TextBlock Text="{Binding Summary}" FontFamily="Consolas, Yu Gothic UI" FontSize="12" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <Border Grid.Row="2"
+                            BorderBrush="#313744"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Background="#1C2028">
+                        <ScrollViewer IsEnabled="{Binding HasSelectedExtrusion.Value}">
+                            <StackPanel Spacing="8" Margin="10">
+                                <TextBlock Text="選択中の Extrusion ルール" FontWeight="SemiBold" />
+                                <Grid ColumnDefinitions="150,*"
+                                      RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                      RowSpacing="6"
+                                      ColumnSpacing="8">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Rule Key (任意)" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ExtKey.Value, Mode=TwoWay}" Watermark="例: RoadSurface" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="CrossSectionKey" />
+                                    <ComboBox Grid.Row="1" Grid.Column="1"
+                                              HorizontalAlignment="Stretch"
+                                              ItemsSource="{Binding AvailableCrossSectionKeys}"
+                                              SelectedItem="{Binding ExtCrossSectionKey.Value, Mode=TwoWay}" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="OffsetX (m)" />
+                                    <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ExtOffsetX.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="OffsetY (m)" />
+                                    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding ExtOffsetY.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="From (開始距離 m)" />
+                                    <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding ExtFrom.Value, Mode=TwoWay}" Minimum="0" Increment="1" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="BaseInterval (m)" />
+                                    <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding ExtBaseInterval.Value, Mode=TwoWay}" Minimum="0.1" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="MaxDeviation (m)" />
+                                    <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding ExtMaxDeviation.Value, Mode=TwoWay}" Minimum="0.001" Increment="0.005" FormatString="0.####" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" Text="MaxAngleDeltaDeg (°)" />
+                                    <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding ExtMaxAngleDeltaDeg.Value, Mode=TwoWay}" Minimum="0.1" Increment="0.5" FormatString="0.##" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="VIntervalScale" />
+                                    <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding ExtVIntervalScale.Value, Mode=TwoWay}" Minimum="0.01" Increment="0.1" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="9" Grid.Column="0" VerticalAlignment="Center" Text="VOffset" />
+                                    <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding ExtVOffset.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" ShowButtonSpinner="False" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Props Tab -->
+            <TabItem Header="プロップ (Props)">
+                <Grid RowDefinitions="Auto,120,*" RowSpacing="6" Margin="0,6,0,0">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                        <Button Content="+ プロップ追加" Command="{Binding AddPropCommand}" />
+                        <Button Content="上へ" Command="{Binding MovePropUpCommand}" />
+                        <Button Content="下へ" Command="{Binding MovePropDownCommand}" />
+                        <Button Content="削除" Command="{Binding RemovePropCommand}" />
+                    </StackPanel>
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Props}"
+                             SelectedItem="{Binding SelectedProp.Value, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SplineTemplatePropRow">
+                                <TextBlock Text="{Binding Summary}" FontFamily="Consolas, Yu Gothic UI" FontSize="12" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <Border Grid.Row="2"
+                            BorderBrush="#313744"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Background="#1C2028">
+                        <ScrollViewer IsEnabled="{Binding HasSelectedProp.Value}">
+                            <StackPanel Spacing="8" Margin="10">
+                                <TextBlock Text="選択中の Prop ルール" FontWeight="SemiBold" />
+                                <Grid ColumnDefinitions="150,*"
+                                      RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                      RowSpacing="6"
+                                      ColumnSpacing="8">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Rule Key (任意)" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding PropKey.Value, Mode=TwoWay}" Watermark="例: StreetLight" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="ModelKeys (カンマ区切り)" />
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
+                                        <TextBox Text="{Binding PropModelKeysText.Value, Mode=TwoWay}" Watermark="例: LightPole, PoleB" />
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                            <ComboBox Grid.Column="0"
+                                                      HorizontalAlignment="Stretch"
+                                                      ItemsSource="{Binding AvailableModelKeys}"
+                                                      SelectedItem="{Binding ModelKeyToAdd.Value, Mode=TwoWay}" />
+                                            <Button Grid.Column="1" Content="+ モデル追記" Command="{Binding AddModelKeyToPropCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="From (m)" />
+                                    <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding PropFrom.Value, Mode=TwoWay}" Minimum="0" Increment="1" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Span (m, 0=終端まで)" />
+                                    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding PropSpan.Value, Mode=TwoWay}" Minimum="0" Increment="5" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Interval (m, 0=単発)" />
+                                    <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding PropInterval.Value, Mode=TwoWay}" Minimum="0" Increment="1" FormatString="0.###" ShowButtonSpinner="False" />
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="相対オフセット (X, Y, Z)" />
+                                    <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,6,*,6,*">
+                                        <NumericUpDown Grid.Column="0" Value="{Binding PropPosX.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.###" ShowButtonSpinner="False" />
+                                        <NumericUpDown Grid.Column="2" Value="{Binding PropPosY.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.###" ShowButtonSpinner="False" />
+                                        <NumericUpDown Grid.Column="4" Value="{Binding PropPosZ.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.###" ShowButtonSpinner="False" />
+                                    </Grid>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="相対回転 (° RotationX, RotationY, RotationZ)" />
+                                    <Grid Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,6,*,6,*">
+                                        <NumericUpDown Grid.Column="0" Value="{Binding PropRotX.Value, Mode=TwoWay}" Increment="5" FormatString="0.##" ShowButtonSpinner="False" />
+                                        <NumericUpDown Grid.Column="2" Value="{Binding PropRotY.Value, Mode=TwoWay}" Increment="15" FormatString="0.##" ShowButtonSpinner="False" />
+                                        <NumericUpDown Grid.Column="4" Value="{Binding PropRotZ.Value, Mode=TwoWay}" Increment="5" FormatString="0.##" ShowButtonSpinner="False" />
+                                    </Grid>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- UserCode Tab -->
+            <TabItem Header="カスタムコード">
+                <DockPanel Margin="0,8,0,0">
+                    <TextBlock DockPanel.Dock="Top"
+                               Margin="0,0,0,6"
+                               FontSize="12"
+                               Opacity="0.8"
+                               Text="SplineTemplate の // &lt;user-code&gt; ブロック内にそのまま出力される C# スクリプト追記領域です。" />
+                    <controls:CSharpCodeEditor Text="{Binding UserCode.Value, Mode=TwoWay}"
+                                               CommitOnTextChanged="True"
+                                               IsReadOnly="{Binding IsProtected.Value}" />
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+        </Grid>
+    </Grid>
+</UserControl>

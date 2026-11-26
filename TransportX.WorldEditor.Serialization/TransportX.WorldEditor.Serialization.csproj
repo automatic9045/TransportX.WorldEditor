@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyVersion>0.1.61126.1</AssemblyVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TransportX.WorldEditor.Core\TransportX.WorldEditor.Core.csproj" />
+    <ProjectReference Include="..\..\..\external\TransportX\TransportX\TransportX.csproj" />
+    <ProjectReference Include="..\..\..\external\TransportX\TransportX.Scripting\TransportX.Scripting.csproj" />
+  </ItemGroup>
+
+</Project>

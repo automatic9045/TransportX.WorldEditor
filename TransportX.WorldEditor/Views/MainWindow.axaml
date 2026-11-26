@@ -1,0 +1,184 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dock="using:Dock.Avalonia.Controls"
+        xmlns:vm="using:TransportX.WorldEditor.ViewModels"
+        x:Class="TransportX.WorldEditor.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding WindowTitle.Value}"
+        Width="1540"
+        Height="920"
+        MinWidth="1024"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="ファイル (_F)">
+        <MenuItem Header="新規ワールド作成 (_N)..."
+                  InputGesture="Ctrl+N"
+                  IsEnabled="{Binding CanStartNewOrOpen.Value}"
+                  Command="{Binding NewWorldCommand}" />
+        <MenuItem Header="ワールドを開く (_O)..."
+                  InputGesture="Ctrl+O"
+                  IsEnabled="{Binding CanStartNewOrOpen.Value}"
+                  Command="{Binding OpenWorldCommand}" />
+        <MenuItem Header="ワールドをインポート (_I)..."
+                  IsEnabled="{Binding CanStartNewOrOpen.Value}"
+                  Command="{Binding ImportWorldCommand}" />
+        <Separator />
+        <MenuItem Header="上書き保存 (_S)"
+                  InputGesture="Ctrl+S"
+                  IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                  Command="{Binding SaveCommand}" />
+        <MenuItem Header="すべて保存 (_A)"
+                  InputGesture="Ctrl+Shift+S"
+                  IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                  Command="{Binding SaveAllCommand}" />
+        <Separator />
+        <MenuItem Header="終了 (_X)"
+                  Command="{Binding ExitCommand}" />
+      </MenuItem>
+
+      <MenuItem Header="編集 (_E)">
+        <MenuItem Header="{Binding UndoMenuHeader.Value}"
+                  InputGesture="Ctrl+Z"
+                  IsEnabled="{Binding CanUndo.Value}"
+                  Command="{Binding UndoCommand}" />
+        <MenuItem Header="{Binding RedoMenuHeader.Value}"
+                  InputGesture="Ctrl+Y"
+                  IsEnabled="{Binding CanRedo.Value}"
+                  Command="{Binding RedoCommand}" />
+      </MenuItem>
+
+      <MenuItem Header="ワールド (_W)">
+        <MenuItem Header="ワールド設定 / Init (_I)"
+                  IsEnabled="{Binding HasOpenProject.Value}"
+                  Command="{Binding OpenWorldSettingsCommand}" />
+        <MenuItem Header="環境設定 (Environment) (_E)"
+                  IsEnabled="{Binding HasOpenProject.Value}"
+                  Command="{Binding OpenEnvironmentCommand}" />
+      </MenuItem>
+
+      <MenuItem Header="検証 (_V)">
+        <MenuItem Header="編集モード (_E)"
+                  IsEnabled="{Binding IsVerificationMode.Value}"
+                  Command="{Binding SwitchToEditModeCommand}" />
+        <MenuItem Header="スクリプト検証実行 (_R)"
+                  InputGesture="F5"
+                  IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                  Command="{Binding RunScriptVerificationCommand}" />
+        <MenuItem Header="TransportX.Player で試走 (_P)"
+                  InputGesture="Ctrl+F5"
+                  IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                  Command="{Binding LaunchPlayerCommand}" />
+        <Separator />
+        <MenuItem Header="World.csx を外部エディタで開く (_O)"
+                  IsEnabled="{Binding HasOpenProject.Value}"
+                  Command="{Binding OpenWorldCsxExternalCommand}" />
+      </MenuItem>
+
+      <MenuItem Header="ウィンドウ (_N)">
+        <MenuItem Header="シーン階層 (_H)"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding IsSceneHierarchyVisible.Value, Mode=OneWay}"
+                  Command="{Binding ToggleSceneHierarchyCommand}" />
+        <MenuItem Header="アセット / テンプレート (_A)"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding IsAssetBrowserVisible.Value, Mode=OneWay}"
+                  Command="{Binding ToggleAssetBrowserCommand}" />
+        <MenuItem Header="プロパティ / 変更状態 (_P)"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding IsInspectorVisible.Value, Mode=OneWay}"
+                  Command="{Binding ToggleInspectorCommand}" />
+        <MenuItem Header="マルチトラック・タイムライン (_T)"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding IsTimelineVisible.Value, Mode=OneWay}"
+                  Command="{Binding ToggleTimelineCommand}" />
+        <MenuItem Header="診断 / エラー (_D)"
+                  ToggleType="CheckBox"
+                  IsChecked="{Binding IsDiagnosticsVisible.Value, Mode=OneWay}"
+                  Command="{Binding ToggleDiagnosticsCommand}" />
+        <Separator />
+        <MenuItem Header="レイアウトを初期状態に戻す (_R)"
+                  Command="{Binding ResetWindowLayoutCommand}" />
+      </MenuItem>
+    </Menu>
+
+    <Border DockPanel.Dock="Top"
+            Background="#252526"
+            BorderBrush="#3F3F46"
+            BorderThickness="0,0,0,1"
+            Padding="8,5">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button Content="新規ワールド"
+                IsEnabled="{Binding CanStartNewOrOpen.Value}"
+                Command="{Binding NewWorldCommand}" />
+        <Button Content="開く"
+                IsEnabled="{Binding CanStartNewOrOpen.Value}"
+                Command="{Binding OpenWorldCommand}" />
+        <Button Content="インポート"
+                ToolTip.Tip="Editor非対応のワールドデータを別プロジェクトとして再構築し、開きます"
+                IsEnabled="{Binding CanStartNewOrOpen.Value}"
+                Command="{Binding ImportWorldCommand}" />
+        <Button Content="保存"
+                IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                Command="{Binding SaveCommand}" />
+        <Button Content="すべて保存"
+                IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                Command="{Binding SaveAllCommand}" />
+        <Separator Width="1" Background="#3F3F46" Margin="4,2" />
+        <Button Content="ワールド設定 / Init"
+                IsEnabled="{Binding HasOpenProject.Value}"
+                Command="{Binding OpenWorldSettingsCommand}" />
+        <Button Content="環境設定"
+                IsEnabled="{Binding HasOpenProject.Value}"
+                Command="{Binding OpenEnvironmentCommand}" />
+        <Separator Width="1" Background="#3F3F46" Margin="4,2" />
+        <Button Content="元に戻す"
+                ToolTip.Tip="{Binding UndoMenuHeader.Value}"
+                IsEnabled="{Binding CanUndo.Value}"
+                Command="{Binding UndoCommand}" />
+        <Button Content="やり直す"
+                ToolTip.Tip="{Binding RedoMenuHeader.Value}"
+                IsEnabled="{Binding CanRedo.Value}"
+                Command="{Binding RedoCommand}" />
+        <Separator Width="1" Background="#3F3F46" Margin="4,2" />
+        <Button Content="編集"
+                IsEnabled="{Binding IsVerificationMode.Value}"
+                Command="{Binding SwitchToEditModeCommand}" />
+        <Button Content="検証 (F5)"
+                IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                Command="{Binding RunScriptVerificationCommand}" />
+        <Button Content="Player試走"
+                IsEnabled="{Binding CanRunWorkspaceActions.Value}"
+                Command="{Binding LaunchPlayerCommand}" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom"
+            Background="#007ACC"
+            Padding="10,4">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+        <TextBlock Grid.Column="0"
+                   Text="{Binding StatusText.Value}"
+                   Foreground="White"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1"
+                   Text="スクリプト解析中..."
+                   Foreground="#E0F2FE"
+                   FontSize="11.5"
+                   VerticalAlignment="Center"
+                   IsVisible="{Binding IsBackgroundCompiling.Value}" />
+        <ProgressBar Grid.Column="2"
+                     Width="120"
+                     Height="6"
+                     IsIndeterminate="True"
+                     VerticalAlignment="Center"
+                     IsVisible="{Binding IsVerificationStarting.Value}" />
+      </Grid>
+    </Border>
+
+    <dock:DockControl Layout="{Binding RootDock.Value}" />
+  </DockPanel>
+</Window>

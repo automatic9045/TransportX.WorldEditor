@@ -1,0 +1,61 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:themes="using:Dock.Avalonia.Themes.Fluent"
+             xmlns:local="using:TransportX.WorldEditor"
+             x:Class="TransportX.WorldEditor.App"
+             RequestedThemeVariant="Dark">
+    <Application.Resources>
+        <x:Double x:Key="TabItemHeaderFontSize">13</x:Double>
+        <FontFamily x:Key="ContentControlThemeFontFamily">Yu Gothic UI, Meiryo, Segoe UI, Inter</FontFamily>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+        <themes:DockFluentTheme />
+        <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
+        <Style Selector=":is(TopLevel)">
+            <Setter Property="FontFamily" Value="Yu Gothic UI, Meiryo, Segoe UI, Inter" />
+        </Style>
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="Yu Gothic UI, Meiryo, Segoe UI, Inter" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="FontFamily" Value="Yu Gothic UI, Meiryo, Segoe UI, Inter" />
+        </Style>
+        <Style Selector="Button, ToggleButton, CheckBox, ComboBox, ComboBoxItem, MenuItem, MenuFlyoutPresenter, FlyoutPresenter, ContextMenu, ToolTip">
+            <Setter Property="FontFamily" Value="Yu Gothic UI, Meiryo, Segoe UI, Inter" />
+        </Style>
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="10,4" />
+        </Style>
+        <Style Selector="NumericUpDown">
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
+        <Style Selector="NumericUpDown /template/ ButtonSpinner">
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
+        <Style Selector="ButtonSpinner /template/ RepeatButton">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="MinWidth" Value="16" />
+            <Setter Property="Padding" Value="1,0" />
+            <Setter Property="FontSize" Value="9" />
+        </Style>
+        <Style Selector="ButtonSpinner /template/ RepeatButton PathIcon">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="7" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <Style Selector="ButtonSpinner /template/ RepeatButton Path">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="5" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+    </Application.Styles>
+
+    <Application.DataTemplates>
+        <local:ViewLocator />
+    </Application.DataTemplates>
+</Application>

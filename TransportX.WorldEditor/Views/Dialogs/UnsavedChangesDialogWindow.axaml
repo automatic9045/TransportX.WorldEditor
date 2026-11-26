@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TransportX.WorldEditor.Views.Dialogs.UnsavedChangesDialogWindow"
+        Title="未保存の変更の確認"
+        Width="480"
+        MinHeight="230"
+        MaxHeight="380"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16" RowSpacing="10">
+    <TextBlock Grid.Row="0"
+               Text="未保存の変更があります。終了する前に変更を保存しますか？"
+               FontWeight="SemiBold"
+               FontSize="13.5"
+               TextWrapping="Wrap" />
+
+    <Border Grid.Row="1"
+            BorderBrush="#3F3F46"
+            BorderThickness="1"
+            CornerRadius="4"
+            Background="#1B1E24"
+            Padding="6">
+      <ListBox x:Name="DirtyFilesListBox"
+               MaxHeight="150"
+               Background="Transparent"
+               BorderThickness="0"
+               FontSize="12" />
+    </Border>
+
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button Content="保存して終了"
+              IsDefault="True"
+              Background="#0E639C"
+              Foreground="#FFFFFF"
+              Padding="12,5"
+              Click="OnSaveAndExitClicked" />
+      <Button Content="保存せず終了"
+              Padding="12,5"
+              Click="OnDiscardAndExitClicked" />
+      <Button Content="キャンセル"
+              IsCancel="True"
+              Padding="12,5"
+              Click="OnCancelClicked" />
+    </StackPanel>
+  </Grid>
+</Window>

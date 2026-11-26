@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="TransportX.WorldEditor.Views.Dialogs.NewWorldDialogWindow"
+        Title="新規ワールドを作成"
+        Width="480"
+        Height="290"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid RowDefinitions="*,Auto" Margin="16" RowSpacing="14">
+        <Grid Grid.Row="0" ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="著者名 (Author)" />
+            <TextBox x:Name="AuthorBox" Grid.Row="0" Grid.Column="1" Text="MyAuthor" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="フォルダ名 (Key)" />
+            <TextBox x:Name="WorldKeyBox" Grid.Row="1" Grid.Column="1" Text="NewWorld" />
+
+            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="タイトル (Title)" />
+            <TextBox x:Name="TitleBox" Grid.Row="2" Grid.Column="1" Text="新しいワールド" />
+
+            <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="説明" />
+            <TextBox x:Name="DescriptionBox" Grid.Row="3" Grid.Column="1" Text="TransportX GUI ワールドエディタで作成" />
+        </Grid>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="作成先フォルダを選択して作成..." IsDefault="True" Click="OnCreateClicked" />
+            <Button Content="キャンセル" IsCancel="True" Click="OnCancelClicked" />
+        </StackPanel>
+    </Grid>
+</Window>

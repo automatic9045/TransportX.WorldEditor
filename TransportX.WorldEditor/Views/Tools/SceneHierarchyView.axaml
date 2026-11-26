@@ -1,0 +1,101 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dockvm="using:TransportX.WorldEditor.ViewModels.Dock"
+             x:Class="TransportX.WorldEditor.Views.Tools.SceneHierarchyView"
+             x:DataType="dockvm:SceneHierarchyToolViewModel">
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.hierarchy-tab">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Padding" Value="4,3" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="#252A34" />
+      <Setter Property="BorderBrush" Value="#3E4554" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#D6DCE8" />
+    </Style>
+    <Style Selector="ToggleButton.hierarchy-tab:checked">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ToggleButton.hierarchy-tab:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+    </Style>
+  </UserControl.Styles>
+  <DockPanel Margin="6">
+    <StackPanel DockPanel.Dock="Top" Spacing="5" Margin="0,0,0,6">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+        <TextBox Grid.Column="0"
+                 Watermark="フィルタ (表示名 / Key / 種別 / チャンク)..."
+                 Text="{Binding FilterText.Value, Mode=TwoWay}" />
+        <Button Grid.Column="1"
+                Content="+ 追加 ▾"
+                FontSize="12"
+                Padding="8,4"
+                IsEnabled="{Binding HasOpenProject.Value}">
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedRight">
+              <MenuItem Header="プロップ" Command="{Binding AddNewPropCommand}" />
+              <MenuItem Header="背景モデル" Command="{Binding AddNewBackgroundCommand}" />
+              <MenuItem Header="スプライン" Command="{Binding AddNewSplineCommand}" />
+              <MenuItem Header="ジャンクション" Command="{Binding AddNewJunctionCommand}" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+      </Grid>
+
+      <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="3">
+        <ToggleButton Grid.Column="0"
+                      Classes="hierarchy-tab"
+                      Content="すべて"
+                      IsChecked="{Binding IsFilterAll.Value, Mode=OneWay}"
+                      Command="{Binding SelectFilterAllCommand}" />
+        <ToggleButton Grid.Column="1"
+                      Classes="hierarchy-tab"
+                      Content="環境"
+                      IsChecked="{Binding IsFilterEnvironment.Value, Mode=OneWay}"
+                      Command="{Binding SelectFilterEnvironmentCommand}" />
+        <ToggleButton Grid.Column="2"
+                      Classes="hierarchy-tab"
+                      Content="プロップ"
+                      IsChecked="{Binding IsFilterProps.Value, Mode=OneWay}"
+                      Command="{Binding SelectFilterPropsCommand}" />
+        <ToggleButton Grid.Column="3"
+                      Classes="hierarchy-tab"
+                      Content="ネットワーク"
+                      IsChecked="{Binding IsFilterNetwork.Value, Mode=OneWay}"
+                      Command="{Binding SelectFilterNetworkCommand}" />
+      </Grid>
+
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+        <TextBlock Grid.Column="0" Text="並び順:" VerticalAlignment="Center" FontSize="11.5" Opacity="0.8" />
+        <ComboBox Grid.Column="1"
+                  HorizontalAlignment="Stretch"
+                  FontSize="11.5"
+                  Padding="8,3"
+                  ItemsSource="{Binding SortModeLabels}"
+                  SelectedIndex="{Binding SelectedSortModeIndex.Value, Mode=TwoWay}" />
+      </Grid>
+    </StackPanel>
+    <ListBox ItemsSource="{Binding Items}"
+             SelectedItem="{Binding SelectedItem.Value, Mode=TwoWay}"
+             DoubleTapped="OnSceneItemDoubleTapped">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="dockvm:SceneItemEntry">
+          <StackPanel Spacing="1" Margin="2">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Border Background="#2D4A6E" CornerRadius="3" Padding="4,1">
+                <TextBlock Text="{Binding Category}" FontSize="11" Foreground="#DCEBFF" />
+              </Border>
+              <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+            </StackPanel>
+            <TextBlock Text="{Binding SubLabel}" FontSize="11" Opacity="0.72" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </DockPanel>
+</UserControl>

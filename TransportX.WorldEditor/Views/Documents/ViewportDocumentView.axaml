@@ -1,0 +1,318 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:coremodels="using:TransportX.WorldEditor.Core.Models"
+             xmlns:dockvm="using:TransportX.WorldEditor.ViewModels.Dock"
+             xmlns:controls="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Documents.ViewportDocumentView"
+             x:DataType="dockvm:ViewportDocumentViewModel">
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.tool-toggle">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Padding" Value="7,3" />
+      <Setter Property="Background" Value="#2D3139" />
+      <Setter Property="BorderBrush" Value="#464C59" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#DCE2EC" />
+    </Style>
+    <Style Selector="ToggleButton.tool-toggle:checked">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ToggleButton.tool-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+    </Style>
+    <Style Selector="ToggleButton.tool-toggle:disabled">
+      <Setter Property="Opacity" Value="0.42" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Top Viewport Toolbar (above HWND, zero Airspace conflict) -->
+    <Border DockPanel.Dock="Top"
+            Background="#22252A"
+            BorderBrush="#3F3F46"
+            BorderThickness="0,0,0,1">
+      <StackPanel>
+        <!-- Row 1: Primary Tools & Display/Camera Flyouts -->
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,4" ColumnSpacing="10" VerticalAlignment="Center">
+          <!-- Left: Tool mode toggles -->
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <TextBlock Text="ツール:" VerticalAlignment="Center" FontSize="12" Opacity="0.85" />
+            <ToggleButton Classes="tool-toggle"
+                          Content="選択"
+                          IsChecked="{Binding IsSelectToolActive.Value, Mode=OneWay}"
+                          Command="{Binding SelectToolCommand}" />
+            <ToggleButton Classes="tool-toggle"
+                          Content="移動"
+                          IsChecked="{Binding IsTranslateToolActive.Value, Mode=OneWay}"
+                          IsEnabled="{Binding CanTransformSelected.Value}"
+                          ToolTip.Tip="{Binding TransformDisabledReason.Value}"
+                          ToolTip.ShowOnDisabled="True"
+                          Command="{Binding TranslateToolCommand}" />
+            <ToggleButton Classes="tool-toggle"
+                          Content="回転"
+                          IsChecked="{Binding IsRotateToolActive.Value, Mode=OneWay}"
+                          IsEnabled="{Binding CanTransformSelected.Value}"
+                          ToolTip.Tip="{Binding TransformDisabledReason.Value}"
+                          ToolTip.ShowOnDisabled="True"
+                          Command="{Binding RotateToolCommand}" />
+          </StackPanel>
+
+          <!-- Right: Snap + Display/Camera Flyouts -->
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="移動量(m):" VerticalAlignment="Center" FontSize="12" Opacity="0.85" />
+            <ComboBox Width="66"
+                      FontSize="12"
+                      ItemsSource="{Binding GridSnapOptions}"
+                      SelectedItem="{Binding Workspace.GridSnapMeters.Value, Mode=TwoWay}" />
+            <TextBlock Text="回転量(°):" VerticalAlignment="Center" FontSize="12" Opacity="0.85" />
+            <ComboBox Width="66"
+                      FontSize="12"
+                      ItemsSource="{Binding AngleSnapOptions}"
+                      SelectedItem="{Binding Workspace.AngleSnapDegrees.Value, Mode=TwoWay}" />
+
+            <Button Content="表示 ▾" FontSize="12" Padding="8,3">
+              <Button.Flyout>
+                <Flyout Placement="BottomEdgeAlignedRight">
+                  <StackPanel Spacing="6" MinWidth="170" Margin="4">
+                    <TextBlock Text="表示レイヤー" FontWeight="SemiBold" FontSize="12" />
+                    <CheckBox Content="通常"
+                              FontSize="12"
+                              IsEnabled="{Binding !IsVerificationMode.Value}"
+                              ToolTip.Tip="検証モード中は TransportX 本体の描画仕様により常時表示されます"
+                              ToolTip.ShowOnDisabled="True"
+                              IsChecked="{Binding ShowNormalLayer.Value, Mode=TwoWay}" />
+                    <CheckBox Content="物理"
+                              FontSize="12"
+                              IsChecked="{Binding ShowCollidersLayer.Value, Mode=TwoWay}" />
+                    <CheckBox Content="ネットワーク"
+                              FontSize="12"
+                              IsChecked="{Binding ShowNetworkLayer.Value, Mode=TwoWay}" />
+                    <CheckBox Content="交通"
+                              FontSize="12"
+                              IsEnabled="{Binding IsVerificationMode.Value}"
+                              ToolTip.Tip="スクリプト検証モード (F5) 実行中のみ切り替えできます"
+                              ToolTip.ShowOnDisabled="True"
+                              IsChecked="{Binding ShowTrafficLayer.Value, Mode=TwoWay}" />
+                    <Separator />
+                    <CheckBox Content="チャンクグリッド"
+                              FontSize="12"
+                              IsEnabled="{Binding !IsVerificationMode.Value}"
+                              ToolTip.Tip="編集モード専用のオーバーレイ表示です"
+                              ToolTip.ShowOnDisabled="True"
+                              IsChecked="{Binding ShowChunkGridLayer.Value, Mode=TwoWay}" />
+                    <CheckBox Content="選択アンカー"
+                              FontSize="12"
+                              IsEnabled="{Binding !IsVerificationMode.Value}"
+                              ToolTip.Tip="編集モード専用のオーバーレイ表示です"
+                              ToolTip.ShowOnDisabled="True"
+                              IsChecked="{Binding ShowAnchorsLayer.Value, Mode=TwoWay}" />
+                    <CheckBox Content="選択ギズモ"
+                              FontSize="12"
+                              IsEnabled="{Binding !IsVerificationMode.Value}"
+                              ToolTip.Tip="編集モード専用のオーバーレイ表示です"
+                              ToolTip.ShowOnDisabled="True"
+                              IsChecked="{Binding ShowGizmosLayer.Value, Mode=TwoWay}" />
+                  </StackPanel>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
+
+            <Button Content="カメラ ▾" FontSize="12" Padding="8,3">
+              <Button.Flyout>
+                <Flyout Placement="BottomEdgeAlignedRight">
+                  <StackPanel Spacing="8" Width="280" Margin="4">
+                    <Button Content="選択対象へフォーカス (F)"
+                            FontSize="12"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding FocusSelectedCommand}" />
+
+                    <Separator />
+
+                    <TextBlock Text="チャンク移動 (Chunk X, Z)" FontWeight="SemiBold" FontSize="12" />
+                    <Grid ColumnDefinitions="*,6,*,6,Auto">
+                      <NumericUpDown Grid.Column="0"
+                                     FontSize="12"
+                                     FormatString="0"
+                                     ShowButtonSpinner="False"
+                                     Value="{Binding JumpChunkX.Value, Mode=TwoWay}" />
+                      <NumericUpDown Grid.Column="2"
+                                     FontSize="12"
+                                     FormatString="0"
+                                     ShowButtonSpinner="False"
+                                     Value="{Binding JumpChunkZ.Value, Mode=TwoWay}" />
+                      <Button Grid.Column="4" Content="移動" FontSize="12" Padding="10,3" Command="{Binding JumpToChunkCommand}" />
+                    </Grid>
+
+                    <Separator />
+
+                    <TextBlock Text="カメラ視点ブックマーク" FontWeight="SemiBold" FontSize="12" />
+                    <ComboBox HorizontalAlignment="Stretch"
+                              FontSize="12"
+                              ItemsSource="{Binding CameraBookmarks}"
+                              SelectedIndex="{Binding SelectedBookmarkIndex.Value, Mode=TwoWay}">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="coremodels:CameraBookmarkModel">
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Grid ColumnDefinitions="*,6,Auto">
+                      <TextBox Grid.Column="0"
+                               FontSize="12"
+                               Watermark="新しい視点名"
+                               Text="{Binding NewBookmarkName.Value, Mode=TwoWay}" />
+                      <Button Grid.Column="2" Content="+ 登録" FontSize="12" Padding="8,3" Command="{Binding AddBookmarkCommand}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,6,*">
+                      <Button Grid.Column="0" Content="呼出" FontSize="12" HorizontalAlignment="Stretch" Command="{Binding JumpToBookmarkCommand}" />
+                      <Button Grid.Column="2" Content="削除" FontSize="12" HorizontalAlignment="Stretch" Command="{Binding RemoveBookmarkCommand}" />
+                    </Grid>
+                  </StackPanel>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
+          </StackPanel>
+        </Grid>
+
+        <!-- Row 2: Dynamic Context Bar (only visible during interactive placement mode) -->
+        <Border Background="#1B2A3D"
+                BorderBrush="#2E5480"
+                BorderThickness="0,1,0,0"
+                Padding="8,4"
+                IsVisible="{Binding IsAnyPlacementModeActive.Value}">
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10" VerticalAlignment="Center">
+            <Border Grid.Column="0"
+                    Background="#0E639C"
+                    CornerRadius="3"
+                    Padding="7,2"
+                    VerticalAlignment="Center">
+              <TextBlock Text="{Binding ActivePlacementTitle.Value}"
+                         Foreground="#FFFFFF"
+                         FontSize="11.5"
+                         FontWeight="SemiBold" />
+            </Border>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsPlacePropToolActive.Value}">
+                <TextBlock Text="モデル:" VerticalAlignment="Center" FontSize="12" Opacity="0.9" />
+                <ComboBox Width="190"
+                          FontSize="12"
+                          ItemsSource="{Binding AvailableModelKeys}"
+                          SelectedItem="{Binding Workspace.PlacementModelKey.Value, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsPlaceSplineToolActive.Value}">
+                <TextBlock Text="テンプレート:" VerticalAlignment="Center" FontSize="12" Opacity="0.9" />
+                <ComboBox Width="190"
+                          FontSize="12"
+                          ItemsSource="{Binding AvailableSplineTemplateKeys}"
+                          SelectedItem="{Binding Workspace.PlacementSplineTemplateKey.Value, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsPlaceJunctionToolActive.Value}">
+                <TextBlock Text="テンプレート:" VerticalAlignment="Center" FontSize="12" Opacity="0.9" />
+                <ComboBox Width="190"
+                          FontSize="12"
+                          ItemsSource="{Binding AvailableJunctionTemplateKeys}"
+                          SelectedItem="{Binding Workspace.PlacementJunctionTemplateKey.Value, Mode=TwoWay}" />
+              </StackPanel>
+            </StackPanel>
+
+            <TextBlock Grid.Column="2"
+                       VerticalAlignment="Center"
+                       FontSize="11.5"
+                       Foreground="#BED8F4"
+                       TextTrimming="CharacterEllipsis"
+                       Text="3Dビューをクリックして配置 (ポート近くでスナップ連結) / Escで終了" />
+
+            <Button Grid.Column="3"
+                    Content="配置終了"
+                    FontSize="11.5"
+                    Padding="8,2"
+                    Command="{Binding SelectToolCommand}" />
+          </Grid>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- Mode 2 Script Verification Banner -->
+    <Border DockPanel.Dock="Top"
+            Background="#3C2A1E"
+            BorderBrush="#D97706"
+            BorderThickness="0,0,0,1"
+            Padding="10,4"
+            IsVisible="{Binding IsVerificationMode.Value}">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBlock Grid.Column="0"
+                   VerticalAlignment="Center"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   Foreground="#FDE68A"
+                   Text="{Binding VerificationBannerText.Value}" />
+        <Button Grid.Column="1"
+                Content="編集モードへ戻る (Esc)"
+                FontSize="12"
+                Padding="10,3"
+                Command="{Binding StopVerificationCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Bottom HUD Strip -->
+    <Border DockPanel.Dock="Bottom"
+            Background="#1B1D22"
+            BorderBrush="#3F3F46"
+            BorderThickness="0,1,0,0"
+            Padding="8,3">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0"
+                   Text="{Binding Workspace.CameraStatusText.Value}"
+                   TextTrimming="CharacterEllipsis"
+                   FontSize="11"
+                   Foreground="#D4DCE8" />
+        <TextBlock Grid.Column="1"
+                   Text="{Binding ActiveToolHint.Value}"
+                   FontSize="11"
+                   Opacity="0.78"
+                   Margin="12,0,0,0" />
+      </Grid>
+    </Border>
+
+    <!-- Hosted Direct3D 11 Surface + Mode 2 Loading Overlay (HWND hidden while starting to prevent Airspace clipping) -->
+    <Grid Background="#121418">
+      <controls:Win32HwndViewportHost Workspace="{Binding Workspace}"
+                                      IsVisible="{Binding !IsVerificationStarting.Value}" />
+      <Border Background="#DD121418"
+              IsVisible="{Binding IsVerificationStarting.Value}">
+        <StackPanel VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="10"
+                    MaxWidth="420">
+          <TextBlock Text="スクリプト検証を起動中..."
+                     FontSize="16"
+                     FontWeight="SemiBold"
+                     HorizontalAlignment="Center"
+                     Foreground="#FDE68A" />
+          <TextBlock Text="World.csx のコンパイルと検証ワールドの構築を実行しています。しばらくお待ちください。"
+                     FontSize="12"
+                     Opacity="0.85"
+                     TextWrapping="Wrap"
+                     TextAlignment="Center"
+                     Foreground="#E2E8F0" />
+          <ProgressBar Width="280"
+                       Height="6"
+                       IsIndeterminate="True"
+                       HorizontalAlignment="Center" />
+          <Button Content="キャンセル"
+                  Padding="16,5"
+                  FontSize="12"
+                  HorizontalAlignment="Center"
+                  Command="{Binding CancelVerificationStartCommand}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

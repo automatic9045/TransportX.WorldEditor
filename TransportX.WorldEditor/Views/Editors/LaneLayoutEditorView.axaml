@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             xmlns:ctrl="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Editors.LaneLayoutEditorView"
+             x:DataType="vm:LaneLayoutEditorDocumentViewModel">
+    <Grid ColumnDefinitions="1.4*,1*" Margin="10" ColumnSpacing="12">
+        <Grid Grid.Column="0" RowDefinitions="Auto,*" RowSpacing="8">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+                <CheckBox Content="Opposition (鏡像) 同時プレビュー" IsChecked="{Binding ShowOppositionMirror.Value, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center"
+                           Text="{Binding IsSelfConnectable.Value, StringFormat='対称自己接続可能: {0}'}"
+                           Foreground="#9FB3D1" />
+            </StackPanel>
+
+            <Border Grid.Row="1" BorderBrush="#313744" BorderThickness="1" CornerRadius="4">
+                <ctrl:LaneLayoutCanvas />
+            </Border>
+        </Grid>
+
+        <Grid Grid.Column="1" RowDefinitions="Auto,1*,Auto" RowSpacing="8">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                <Button Content="+ レーン追加" Command="{Binding AddLaneCommand}" />
+                <Button Content="上へ" Command="{Binding MoveUpCommand}" />
+                <Button Content="下へ" Command="{Binding MoveDownCommand}" />
+                <Button Content="削除" Command="{Binding RemoveLaneCommand}" />
+            </StackPanel>
+
+            <Border Grid.Row="1" BorderBrush="#313744" BorderThickness="1" CornerRadius="4" Background="#1D2028">
+                <ListBox ItemsSource="{Binding Lanes}"
+                         SelectedItem="{Binding SelectedLane.Value, Mode=TwoWay}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LaneRowViewModel">
+                            <TextBlock Text="{Binding Summary}" FontFamily="Consolas, Yu Gothic UI" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+
+            <Border Grid.Row="2"
+                    IsEnabled="{Binding HasSelection.Value}"
+                    Background="#20242C"
+                    BorderBrush="#313744"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="12">
+                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8">
+                    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="AllowedTraffic" />
+                    <ComboBox Grid.Row="0" Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding AvailableTrafficKeys}"
+                              SelectedItem="{Binding AllowedTrafficKey.Value, Mode=TwoWay}" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Directions" />
+                    <ComboBox Grid.Row="1" Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding FlowDirectionsValues}"
+                              SelectedItem="{Binding Directions.Value, Mode=TwoWay}" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="中心 X (m)" />
+                    <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding LaneX.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.###" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="高さ Y (m)" />
+                    <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding LaneY.Value, Mode=TwoWay}" Increment="0.05" FormatString="0.###" />
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="LeftWidth (m)" />
+                    <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding LeftWidth.Value, Mode=TwoWay}" Increment="0.25" Minimum="0.05" FormatString="0.###" />
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="RightWidth (m)" />
+                    <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding RightWidth.Value, Mode=TwoWay}" Increment="0.25" Minimum="0.05" FormatString="0.###" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

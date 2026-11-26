@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             xmlns:net="using:TransportX.WorldEditor.Core.Models.Network"
+             xmlns:controls="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Editors.WorldSettingsView"
+             x:DataType="vm:WorldSettingsDocumentViewModel">
+    <ScrollViewer>
+        <StackPanel Spacing="16" MaxWidth="920" Margin="16">
+            <Border Background="#20242C" CornerRadius="6" Padding="14" BorderBrush="#313744" BorderThickness="1">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="ワールド情報 (WorldInfo XML)" FontSize="15" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="10">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="タイトル" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding WorldTitle.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="0,6,0,0" Text="説明" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Description.Value, Mode=TwoWay}" AcceptsReturn="True" Height="60" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="著者 (Author)" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Author.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="アセンブリパス" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding RuntimePath.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="メインスクリプト (Arg)" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding MainScriptArg.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Identifier (任意)" />
+                        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Identifier.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="AppPath (任意)" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding AppPath.Value, Mode=TwoWay}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#20242C" CornerRadius="6" Padding="14" BorderBrush="#313744" BorderThickness="1">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="プラグイン依存 (World.manifest.xml → __Editor.csx 自動同期)" FontSize="15" FontWeight="SemiBold" />
+                    <ListBox ItemsSource="{Binding ManifestDependencies}"
+                             SelectedItem="{Binding SelectedDependency.Value, Mode=TwoWay}"
+                             Height="110" />
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding NewDependencyPath.Value, Mode=TwoWay}" Watermark="$(plugins)Example.dll" />
+                        <Button Grid.Column="1" Content="追加" Command="{Binding AddDependencyCommand}" />
+                        <Button Grid.Column="2" Content="選択を削除" Command="{Binding RemoveDependencyCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#20242C" CornerRadius="6" Padding="14" BorderBrush="#313744" BorderThickness="1">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                        <TextBlock Grid.Column="0" Text="進路交通種別・グループ (Init.csx)" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" Background="#5A2A2A" CornerRadius="4" Padding="8,3" IsVisible="{Binding IsInitProtected.Value}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="ProtectedReadOnly (Init.csx 上書き保護中)" Foreground="#FFD6D6" FontSize="12" VerticalAlignment="Center" />
+                                <Button Content="保護を解除" FontSize="11" Padding="6,2" Command="{Binding UnlockInitProtectedCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <Button Grid.Column="2" Content="Init.csx を外部で開く" FontSize="11.5" Padding="8,3" Command="{Binding OpenInitCsxExternalCommand}" />
+                    </Grid>
+
+                    <TextBlock Text="Traffic Types (AddType)" FontWeight="SemiBold" />
+                    <ListBox ItemsSource="{Binding TrafficTypes}"
+                             SelectedItem="{Binding SelectedTrafficType.Value, Mode=TwoWay}"
+                             Height="110">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="net:LaneTrafficTypeDefinition">
+                                <Grid ColumnDefinitions="150,180,90">
+                                    <TextBlock Grid.Column="0" Text="{Binding Key}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding ColorHex}" Foreground="#A0A8B8" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Grid ColumnDefinitions="140,160,90,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding NewTrafficTypeKey.Value, Mode=TwoWay}" Watermark="Key (例: Buses)" />
+                        <TextBox Grid.Column="1" Text="{Binding NewTrafficTypeName.Value, Mode=TwoWay}" Watermark="表示名 (例: バス)" />
+                        <TextBox Grid.Column="2" Text="{Binding NewTrafficTypeColor.Value, Mode=TwoWay}" Watermark="#00FF00" />
+                        <Button Grid.Column="3" Content="種別追加" Command="{Binding AddTrafficTypeCommand}" />
+                        <Button Grid.Column="4" Content="削除" Command="{Binding RemoveTrafficTypeCommand}" />
+                    </Grid>
+
+                    <Separator Margin="0,4" />
+
+                    <TextBlock Text="Traffic Groups (AddGroup)" FontWeight="SemiBold" />
+                    <ListBox ItemsSource="{Binding TrafficGroups}"
+                             SelectedItem="{Binding SelectedTrafficGroup.Value, Mode=TwoWay}"
+                             Height="90">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LaneTrafficGroupRowViewModel">
+                                <Grid ColumnDefinitions="140,220,90">
+                                    <TextBlock Grid.Column="0" Text="{Binding Key}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding TypeKeysJoined}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding ColorHex}" Foreground="#A0A8B8" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Grid ColumnDefinitions="140,180,90,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Text="{Binding NewTrafficGroupKey.Value, Mode=TwoWay}" Watermark="Group Key (例: Cars)" />
+                        <TextBox Grid.Column="1" Text="{Binding NewTrafficGroupTypeKeys.Value, Mode=TwoWay}" Watermark="Buses|NormalCars" />
+                        <TextBox Grid.Column="2" Text="{Binding NewTrafficGroupColor.Value, Mode=TwoWay}" Watermark="#00FFFF" />
+                        <Button Grid.Column="3" Content="グループ追加" Command="{Binding AddTrafficGroupCommand}" />
+                        <Button Grid.Column="4" Content="削除" Command="{Binding RemoveTrafficGroupCommand}" />
+                    </Grid>
+
+                    <Separator Margin="0,4" />
+
+                    <TextBlock Text="Init.csx // &lt;user-code&gt; (プラグイン拡張設定等)" FontWeight="SemiBold" />
+                    <controls:CSharpCodeEditor Text="{Binding InitUserCode.Value, Mode=TwoWay}"
+                                               IsReadOnly="{Binding IsInitProtected.Value}"
+                                               CommitOnTextChanged="True"
+                                               Height="140" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#20242C" CornerRadius="6" Padding="14" BorderBrush="#313744" BorderThickness="1">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+                        <TextBlock Grid.Column="0" Text="World.csx // &lt;user-code&gt; (トリガー・AI車・独自ギミック)" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" Background="#5A2A2A" CornerRadius="4" Padding="8,3" IsVisible="{Binding IsWorldProtected.Value}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="ProtectedReadOnly (World.csx 上書き保護中)" Foreground="#FFD6D6" FontSize="12" VerticalAlignment="Center" />
+                                <Button Content="保護を解除" FontSize="11" Padding="6,2" Command="{Binding UnlockWorldProtectedCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <Button Grid.Column="2" Content="World.csx を外部で開く" FontSize="11.5" Padding="8,3" Command="{Binding OpenWorldCsxExternalCommand}" />
+                    </Grid>
+                    <controls:CSharpCodeEditor Text="{Binding WorldUserCode.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                               IsReadOnly="{Binding IsWorldProtected.Value}"
+                                               Height="160" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#20242C" CornerRadius="6" Padding="14" BorderBrush="#313744" BorderThickness="1">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="TransportX.Player 実機試走設定 (Mode 3 / Ctrl+F5)" FontSize="15" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding PlayerExecutablePath.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 Watermark="TransportX.Player.exe のパス (空欄時は自動探索)" />
+                        <Button Grid.Column="1" Content="参照..." Command="{Binding BrowsePlayerExecutableCommand}" />
+                        <Button Grid.Column="2" Content="自動検出" Command="{Binding AutoDetectPlayerExecutableCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

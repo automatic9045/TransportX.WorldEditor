@@ -1,0 +1,336 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dockvm="using:TransportX.WorldEditor.ViewModels.Dock"
+             xmlns:ctrl="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Tools.SplineTimelineView"
+             x:DataType="dockvm:TimelineToolViewModel">
+  <DockPanel>
+    <!-- Top Toolbar -->
+    <Border DockPanel.Dock="Top"
+            Background="#1E222B"
+            BorderBrush="#313744"
+            BorderThickness="0,0,0,1"
+            Padding="8,4"
+            IsVisible="{Binding HasSelectedSpline.Value}">
+      <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Text="{Binding HeaderTitle.Value}"
+                   FontWeight="SemiBold"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   Margin="0,2,12,2" />
+
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2,10,2">
+          <Button Content="+ 円曲線" FontSize="11" Padding="6,2" Command="{Binding AddCurveCommand}" />
+          <Button Content="+ 縦曲線" FontSize="11" Padding="6,2" Command="{Binding AddGradientCommand}" />
+          <Button Content="+ カント" FontSize="11" Padding="6,2" Command="{Binding AddCantCommand}" />
+          <Button Content="+ プロップ" FontSize="11" Padding="6,2" Command="{Binding AddPropCommand}" />
+          <Button Content="+ プロップスキップ" FontSize="11" Padding="6,2" Command="{Binding AddPropSkipCommand}" />
+          <Button Content="+ 断面" FontSize="11" Padding="6,2" Command="{Binding AddExtrusionCommand}" />
+          <Button Content="+ 断面スキップ" FontSize="11" Padding="6,2" Command="{Binding AddExtrusionSkipCommand}" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2,0,2">
+          <TextBlock Text="Zoom:" FontSize="11" VerticalAlignment="Center" Opacity="0.8" />
+          <Button Content="-" FontSize="11" Padding="7,2" Command="{Binding ZoomOutCommand}" />
+          <Button Content="+" FontSize="11" Padding="7,2" Command="{Binding ZoomInCommand}" />
+        </StackPanel>
+      </WrapPanel>
+    </Border>
+
+    <!-- Empty Hint when no spline is selected -->
+    <Border Padding="16" IsVisible="{Binding !HasSelectedSpline.Value}">
+      <TextBlock Text="{Binding PlaceholderMessage.Value}"
+                 VerticalAlignment="Center"
+                 HorizontalAlignment="Center"
+                 TextWrapping="Wrap"
+                 Opacity="0.72" />
+    </Border>
+
+    <!-- Main Split: Canvas (Left) + Selected Item Inspector (Right) -->
+    <Grid ColumnDefinitions="1.7*,1.0*"
+          IsVisible="{Binding HasSelectedSpline.Value}">
+      <ScrollViewer Grid.Column="0"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto">
+        <ctrl:SplineTimelineCanvas />
+      </ScrollViewer>
+
+      <Border Grid.Column="1"
+              BorderBrush="#313744"
+              BorderThickness="1,0,0,0"
+              Background="#1A1D24">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="8" Margin="10">
+            <!-- Header & Action Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasSelection.Value}">
+              <Button Content="↑ 上へ" FontSize="11" Padding="7,3"
+                      IsEnabled="{Binding CanReorderSelected.Value}"
+                      Command="{Binding MoveSelectedUpCommand}" />
+              <Button Content="↓ 下へ" FontSize="11" Padding="7,3"
+                      IsEnabled="{Binding CanReorderSelected.Value}"
+                      Command="{Binding MoveSelectedDownCommand}" />
+              <Button Content="削除" FontSize="11" Padding="7,3"
+                      Foreground="#FF9999"
+                      Command="{Binding RemoveSelectedItemCommand}" />
+            </StackPanel>
+
+            <TextBlock Text="タイムライン上のブロックまたはリストから要素を選択してください。"
+                       FontSize="12"
+                       Opacity="0.68"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding !HasSelection.Value}" />
+
+            <!-- Quick block selector list -->
+            <ComboBox HorizontalAlignment="Stretch"
+                      FontSize="11"
+                      ItemsSource="{Binding TimelineBlocks}"
+                      SelectedItem="{Binding SelectedBlock.Value, Mode=TwoWay}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="dockvm:SplineTimelineBlockItem">
+                  <TextBlock Text="{Binding Summary}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <!-- 1. Curve Segment Editor -->
+            <Grid ColumnDefinitions="115,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="6"
+                  IsVisible="{Binding IsCurveSelected.Value}">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="線形種別" />
+              <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding CurveKinds}"
+                        SelectedItem="{Binding CurveKind.Value, Mode=TwoWay}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="12"
+                         Text="{Binding CurveValueLabel.Value}"
+                         IsVisible="{Binding CurveHasValueParameter.Value}" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1"
+                             IsVisible="{Binding CurveHasValueParameter.Value}"
+                             Value="{Binding CurveValue.Value, Mode=TwoWay}"
+                             Increment="10" FormatString="0.####" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="延長距離 L (m)" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1"
+                             Value="{Binding CurveLength.Value, Mode=TwoWay}"
+                             Minimum="0.1" Increment="5" FormatString="0.###" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="終端 Anchor ID" />
+              <TextBox Grid.Row="3" Grid.Column="1"
+                       Watermark="out var (例: s_curve1)"
+                       Text="{Binding CurveAnchorId.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+
+            <!-- 2. Gradient Segment Editor -->
+            <Grid ColumnDefinitions="115,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="6"
+                  IsVisible="{Binding IsGradientSelected.Value}">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="勾配種別" />
+              <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding GradientKinds}"
+                        SelectedItem="{Binding GradientKind.Value, Mode=TwoWay}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="12"
+                         Text="{Binding GradientDeltaLabel.Value}"
+                         IsVisible="{Binding GradientHasDeltaParameter.Value}" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1"
+                             IsVisible="{Binding GradientHasDeltaParameter.Value}"
+                             Value="{Binding GradientDelta.Value, Mode=TwoWay}"
+                             Increment="1" FormatString="0.####" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="長さ L (m)" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding GradientLength.Value, Mode=TwoWay}" Minimum="0.1" Increment="5" FormatString="0.###" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="終端 Anchor ID" />
+              <TextBox Grid.Row="3" Grid.Column="1" Watermark="out var" Text="{Binding GradientAnchorId.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+
+            <!-- 3. Cant Segment Editor -->
+            <Grid ColumnDefinitions="115,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="6"
+                  IsVisible="{Binding IsCantSelected.Value}">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="カント種別" />
+              <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding CantKinds}"
+                        SelectedItem="{Binding CantKind.Value, Mode=TwoWay}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="12"
+                         Text="{Binding CantTargetLabel.Value}"
+                         IsVisible="{Binding CantHasTargetParameter.Value}" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1"
+                             IsVisible="{Binding CantHasTargetParameter.Value}"
+                             Value="{Binding CantTarget.Value, Mode=TwoWay}"
+                             Increment="0.5" FormatString="0.####" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontSize="12"
+                         Text="基準幅 (Gauge m)"
+                         IsVisible="{Binding CantHasGaugeParameter.Value}" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1"
+                             IsVisible="{Binding CantHasGaugeParameter.Value}"
+                             Value="{Binding CantGauge.Value, Mode=TwoWay}"
+                             Minimum="0.1" Increment="0.1" FormatString="0.###" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="長さ L (m)" />
+              <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding CantLength.Value, Mode=TwoWay}" Minimum="0.1" Increment="5" FormatString="0.###" />
+
+              <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="終端 Anchor ID" />
+              <TextBox Grid.Row="4" Grid.Column="1" Watermark="out var" Text="{Binding CantAnchorId.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+
+            <!-- 4. Instance Prop Editor -->
+            <Grid ColumnDefinitions="115,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="6"
+                  IsVisible="{Binding IsPropSelected.Value}">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="Rule Key" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding PropRuleKey.Value, Mode=TwoWay}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="ModelKeys" />
+              <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
+                <TextBox Text="{Binding PropModelKeysText.Value, Mode=TwoWay}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                  <ComboBox Grid.Column="0" HorizontalAlignment="Stretch"
+                            ItemsSource="{Binding AvailableModelKeys}"
+                            SelectedItem="{Binding PropModelKeyToAdd.Value, Mode=TwoWay}" />
+                  <Button Grid.Column="1" Content="+" Padding="7,2" Command="{Binding AppendModelKeyToPropCommand}" />
+                </Grid>
+              </StackPanel>
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="Span (m, 0=終端)" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding PropSpan.Value, Mode=TwoWay}" Minimum="0" Increment="5" FormatString="0.###" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="Interval (m)" />
+              <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding PropInterval.Value, Mode=TwoWay}" Minimum="0" Increment="1" FormatString="0.###" />
+
+              <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="最大個数" />
+              <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding PropCount.Value, Mode=TwoWay}" Minimum="1" Increment="1" FormatString="0" />
+
+              <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="位置 (X, Y, Z)" />
+              <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,4,*,4,*">
+                <NumericUpDown Grid.Column="0" Value="{Binding PropPosX.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.##" ShowButtonSpinner="False" />
+                <NumericUpDown Grid.Column="2" Value="{Binding PropPosY.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.##" ShowButtonSpinner="False" />
+                <NumericUpDown Grid.Column="4" Value="{Binding PropPosZ.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.##" ShowButtonSpinner="False" />
+              </Grid>
+
+              <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="回転 (° RotationX, RotationY, RotationZ)" />
+              <Grid Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,4,*,4,*">
+                <NumericUpDown Grid.Column="0" Value="{Binding PropRotX.Value, Mode=TwoWay}" Increment="5" FormatString="0.#" ShowButtonSpinner="False" />
+                <NumericUpDown Grid.Column="2" Value="{Binding PropRotY.Value, Mode=TwoWay}" Increment="15" FormatString="0.#" ShowButtonSpinner="False" />
+                <NumericUpDown Grid.Column="4" Value="{Binding PropRotZ.Value, Mode=TwoWay}" Increment="5" FormatString="0.#" ShowButtonSpinner="False" />
+              </Grid>
+            </Grid>
+
+            <!-- 5. Instance Extrusion Editor -->
+            <Grid ColumnDefinitions="115,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="6"
+                  IsVisible="{Binding IsExtrusionSelected.Value}">
+              <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="Rule Key" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ExtRuleKey.Value, Mode=TwoWay}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="CrossSection" />
+              <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding AvailableCrossSectionKeys}"
+                        SelectedItem="{Binding ExtCrossSectionKey.Value, Mode=TwoWay}" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="Offset X / Y (m)" />
+              <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,6,*">
+                <NumericUpDown Grid.Column="0" Value="{Binding ExtOffsetX.Value, Mode=TwoWay}" Increment="0.25" FormatString="0.###" />
+                <NumericUpDown Grid.Column="2" Value="{Binding ExtOffsetY.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+              </Grid>
+
+              <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="BaseInterval (m)" />
+              <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding ExtBaseInterval.Value, Mode=TwoWay}" Minimum="0.1" Increment="0.5" FormatString="0.###" />
+
+              <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="MaxDeviation (m)" />
+              <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding ExtMaxDeviation.Value, Mode=TwoWay}" Minimum="0.001" Increment="0.005" FormatString="0.####" />
+
+              <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="MaxAngle (°)" />
+              <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding ExtMaxAngleDeltaDeg.Value, Mode=TwoWay}" Minimum="0.1" Increment="0.5" FormatString="0.##" />
+
+              <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="VScale / VOff" />
+              <Grid Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,6,*">
+                <NumericUpDown Grid.Column="0" Value="{Binding ExtVIntervalScale.Value, Mode=TwoWay}" Minimum="0.01" Increment="0.1" FormatString="0.###" />
+                <NumericUpDown Grid.Column="2" Value="{Binding ExtVOffset.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+              </Grid>
+            </Grid>
+
+            <!-- 6. Skip Rule Key -->
+            <Grid ColumnDefinitions="115,*" ColumnSpacing="6" IsVisible="{Binding IsSkipSelected.Value}">
+              <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="対象 Rule Key" />
+              <TextBox Grid.Column="1" Text="{Binding SkipRuleKey.Value, Mode=TwoWay}" Watermark="テンプレート上の Key" />
+            </Grid>
+
+            <!-- Shared 3-Part AnchoredDistance Picker: From -->
+            <Border BorderBrush="#354866"
+                    BorderThickness="1"
+                    Background="#1D2330"
+                    CornerRadius="4"
+                    Padding="8"
+                    IsVisible="{Binding ShowFromPicker.Value}">
+              <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="開始位置 (From - AnchoredDistance)" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <CheckBox Grid.Column="1" Content="指定" FontSize="11"
+                            IsVisible="{Binding CanToggleFromNull.Value}"
+                            IsChecked="{Binding HasFromDistance.Value, Mode=TwoWay}" />
+                </Grid>
+
+                <StackPanel Spacing="5" IsEnabled="{Binding HasFromDistance.Value}">
+                  <ComboBox HorizontalAlignment="Stretch"
+                            FontSize="11"
+                            ItemsSource="{Binding DistanceModeLabels}"
+                            SelectedIndex="{Binding FromModeIndex.Value, Mode=TwoWay}" />
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch"
+                              MinWidth="125"
+                              FontSize="11"
+                              IsVisible="{Binding FromIsRelative.Value}"
+                              ItemsSource="{Binding AvailableFromAnchorNames}"
+                              SelectedItem="{Binding FromAnchorId.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="1"
+                                   FontSize="11"
+                                   Value="{Binding FromOffset.Value, Mode=TwoWay}"
+                                   Increment="1"
+                                   FormatString="0.###" />
+                  </Grid>
+                  <TextBlock Text="{Binding FromResolvedHint.Value}" FontSize="11" Foreground="#8AD0E6" TextWrapping="Wrap" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Shared 3-Part AnchoredDistance Picker: To -->
+            <Border BorderBrush="#354866"
+                    BorderThickness="1"
+                    Background="#1D2330"
+                    CornerRadius="4"
+                    Padding="8"
+                    IsVisible="{Binding ShowToPicker.Value}">
+              <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="終了位置 (To - AnchoredDistance)" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <CheckBox Grid.Column="1" Content="指定" FontSize="11"
+                            IsVisible="{Binding CanToggleToNull.Value}"
+                            IsChecked="{Binding HasToDistance.Value, Mode=TwoWay}" />
+                </Grid>
+
+                <StackPanel Spacing="5" IsEnabled="{Binding HasToDistance.Value}">
+                  <ComboBox HorizontalAlignment="Stretch"
+                            FontSize="11"
+                            ItemsSource="{Binding DistanceModeLabels}"
+                            SelectedIndex="{Binding ToModeIndex.Value, Mode=TwoWay}" />
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch"
+                              MinWidth="125"
+                              FontSize="11"
+                              IsVisible="{Binding ToIsRelative.Value}"
+                              ItemsSource="{Binding AvailableToAnchorNames}"
+                              SelectedItem="{Binding ToAnchorId.Value, Mode=TwoWay}" />
+                    <NumericUpDown Grid.Column="1"
+                                   FontSize="11"
+                                   Value="{Binding ToOffset.Value, Mode=TwoWay}"
+                                   Increment="1"
+                                   FormatString="0.###" />
+                  </Grid>
+                  <TextBlock Text="{Binding ToResolvedHint.Value}" FontSize="11" Foreground="#8AD0E6" TextWrapping="Wrap" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

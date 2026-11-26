@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             x:Class="TransportX.WorldEditor.Views.Editors.ModelListEditorView"
+             x:DataType="vm:ModelListEditorDocumentViewModel">
+    <Grid ColumnDefinitions="1.1*,1.2*" Margin="10" ColumnSpacing="12">
+        <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto" RowSpacing="8">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                <Button Content="+ モデル追加" Command="{Binding AddEntryCommand}" />
+                <Button Content="複製" Command="{Binding DuplicateEntryCommand}" />
+                <Button Content="上へ" Command="{Binding MoveUpCommand}" />
+                <Button Content="下へ" Command="{Binding MoveDownCommand}" />
+                <Button Content="削除" Command="{Binding RemoveEntryCommand}" />
+            </StackPanel>
+
+            <Border Grid.Row="1" BorderBrush="#313744" BorderThickness="1" CornerRadius="4" Background="#1D2028">
+                <Grid>
+                    <ListBox ItemsSource="{Binding Entries}"
+                             SelectedItem="{Binding SelectedRow.Value, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ModelListRowViewModel">
+                                <Grid ColumnDefinitions="150,1.2*,*" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Text="{Binding Key}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ModelPathDisplay}" Foreground="#A8B3C5" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2" Text="{Binding CommandSummary}" Foreground="#82B1FF" FontFamily="Consolas, Meiryo" TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="モデルエントリがありません。&#x0a;左上の「+ モデル追加」を押して登録してください。"
+                               IsVisible="{Binding HasNoEntries.Value}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               Foreground="#94A0B4"
+                               IsHitTestVisible="False" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="2" Background="#181A20" BorderBrush="#2D313A" BorderThickness="1" CornerRadius="4" Padding="8">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="生成 TSV 行プレビュー:" FontSize="11" Foreground="#98A3B5" />
+                    <TextBlock Text="{Binding LiveTsvPreview.Value}" FontFamily="Consolas, Meiryo" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <ScrollViewer Grid.Column="1" IsEnabled="{Binding HasSelection.Value}">
+            <Border Background="#20242C" BorderBrush="#313744" BorderThickness="1" CornerRadius="6" Padding="14">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="モデルエントリ詳細" FontSize="15" FontWeight="SemiBold" />
+
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="モデルキー" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EntryKey.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="描画モデル" />
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
+                            <CheckBox Content="NONE (描画用モデルなし / 透明コライダー等)" IsChecked="{Binding IsNoneModel.Value, Mode=TwoWay}" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsEnabled="{Binding !IsNoneModel.Value}">
+                                <TextBox Grid.Column="0" Text="{Binding ModelPath.Value, Mode=TwoWay}" />
+                                <Button Grid.Column="1" Content="参照..." Command="{Binding BrowseModelPathCommand}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="コライダー種別" />
+                        <ComboBox Grid.Row="2" Grid.Column="1"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding ColliderKinds}"
+                                  SelectedItem="{Binding SelectedColliderKind.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="座標系 ($LH)" />
+                        <CheckBox Grid.Row="3" Grid.Column="1"
+                                  Content="自動 RH→LH 変換を無効化 ($LH を出力)"
+                                  IsChecked="{Binding DisableLeftHanded.Value, Mode=TwoWay}" />
+                    </Grid>
+
+                    <Border Background="#5A2525" CornerRadius="4" Padding="8" IsVisible="{Binding HasNoneModelError.Value}">
+                        <TextBlock Text="エラー: BoundingBox / ConvexHull / ClosedModel / OpenModel に NONE は指定できません (TransportX 仕様制約)。"
+                                   Foreground="#FFD0D0" TextWrapping="Wrap" FontSize="12" />
+                    </Border>
+
+                    <StackPanel Spacing="6" IsVisible="{Binding ShowCollisionModelPath.Value}">
+                        <TextBlock Text="衝突判定専用モデルパス (任意・省略時は描画モデルと同一)" FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <TextBox Grid.Column="0" Text="{Binding CollisionModelPath.Value, Mode=TwoWay}" Watermark="例: models/road_col.glb" />
+                            <Button Grid.Column="1" Content="参照..." Command="{Binding BrowseCollisionPathCommand}" />
+                        </Grid>
+                        <Border Background="#55441A" CornerRadius="4" Padding="6" IsVisible="{Binding HasUppercaseCollisionPathWarning.Value}">
+                            <TextBlock Text="注意: 衝突モデルパスに大文字が含まれます (TransportX 実行時に小文字化されます)。"
+                                       Foreground="#FFE6A8" FontSize="11" TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Spacing="8" IsVisible="{Binding ShowPrimitiveDimensions.Value}">
+                        <TextBlock Text="プリミティブ形状・オフセット" FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8">
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Size X / Radius" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding SizeX.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Size Y / Length" IsVisible="{Binding ShowSizeY.Value}" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding SizeY.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" IsVisible="{Binding ShowSizeY.Value}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Size Z (Length)" IsVisible="{Binding ShowSizeZ.Value}" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding SizeZ.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" IsVisible="{Binding ShowSizeZ.Value}" />
+                        </Grid>
+
+                        <CheckBox Content="平行移動オフセットを指定 (tx, ty, tz)" IsChecked="{Binding HasTranslationOffset.Value, Mode=TwoWay}" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" IsVisible="{Binding HasTranslationOffset.Value}">
+                            <NumericUpDown Grid.Column="0" Value="{Binding OffsetX.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" ShowButtonSpinner="False" />
+                            <NumericUpDown Grid.Column="1" Value="{Binding OffsetY.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" ShowButtonSpinner="False" />
+                            <NumericUpDown Grid.Column="2" Value="{Binding OffsetZ.Value, Mode=TwoWay}" Increment="0.1" FormatString="0.###" ShowButtonSpinner="False" />
+                        </Grid>
+
+                        <CheckBox Content="回転オフセットを指定 (° RotationX, RotationY, RotationZ)" IsChecked="{Binding HasRotationOffset.Value, Mode=TwoWay}" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" IsVisible="{Binding HasRotationOffset.Value}">
+                            <NumericUpDown Grid.Column="0" Value="{Binding RotX.Value, Mode=TwoWay}" Increment="5" FormatString="0.##" ShowButtonSpinner="False" />
+                            <NumericUpDown Grid.Column="1" Value="{Binding RotY.Value, Mode=TwoWay}" Increment="5" FormatString="0.##" ShowButtonSpinner="False" />
+                            <NumericUpDown Grid.Column="2" Value="{Binding RotZ.Value, Mode=TwoWay}" Increment="5" FormatString="0.##" ShowButtonSpinner="False" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Spacing="8" IsVisible="{Binding CanHaveMaterial.Value}">
+                        <CheckBox Content="物理材質パラメータを明示指定 (Friction, MaxRecovery, SpringFreq, Damping)"
+                                  IsChecked="{Binding HasCustomMaterial.Value, Mode=TwoWay}" />
+                        <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8"
+                              IsVisible="{Binding HasCustomMaterial.Value}">
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="FrictionCoefficient" />
+                            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding FrictionCoefficient.Value, Mode=TwoWay}" Increment="0.1" Minimum="0" FormatString="0.###" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="MaxRecoveryVelocity" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding MaxRecoveryVelocity.Value, Mode=TwoWay}" Increment="1" Minimum="0" FormatString="0.###" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="SpringFrequency" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding SpringFrequency.Value, Mode=TwoWay}" Increment="1" Minimum="0" FormatString="0.###" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="SpringDampingRatio" />
+                            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding SpringDampingRatio.Value, Mode=TwoWay}" Increment="0.1" Minimum="0" FormatString="0.###" />
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

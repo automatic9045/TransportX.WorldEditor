@@ -1,0 +1,600 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dockvm="using:TransportX.WorldEditor.ViewModels.Dock"
+             xmlns:val="using:TransportX.WorldEditor.Core.Validation"
+             xmlns:controls="using:TransportX.WorldEditor.Views.Controls"
+             x:Class="TransportX.WorldEditor.Views.Tools.InspectorView"
+             x:DataType="dockvm:InspectorToolViewModel">
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.inspector-choice">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="Background" Value="#252A34" />
+      <Setter Property="BorderBrush" Value="#3E4554" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#D6DCE8" />
+    </Style>
+    <Style Selector="ToggleButton.inspector-choice:checked">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ToggleButton.inspector-choice:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#0E639C" />
+      <Setter Property="BorderBrush" Value="#3794FF" />
+    </Style>
+  </UserControl.Styles>
+  <ScrollViewer>
+    <StackPanel Spacing="10" Margin="8">
+      <!-- Selected 3D Prop Inspector -->
+      <Border BorderBrush="#3E5C82"
+              BorderThickness="1"
+              Background="#1E242D"
+              CornerRadius="4"
+              Padding="8"
+              IsVisible="{Binding HasSelectedProp.Value}">
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding PropTitleText.Value}" FontWeight="SemiBold" Foreground="#A9C8F5" />
+          <Grid ColumnDefinitions="80,*">
+            <TextBlock Grid.Column="0" Text="表示名 (任意):" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <TextBox Grid.Column="1" Text="{Binding PropDisplayName.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="例: 一郷バス停" />
+          </Grid>
+
+          <Grid ColumnDefinitions="80,*">
+            <TextBlock Grid.Column="0" Text="ID:" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <TextBlock Grid.Column="1" Text="{Binding SelectedPropIdText.Value}" FontWeight="SemiBold" />
+          </Grid>
+
+          <Grid ColumnDefinitions="80,*">
+            <TextBlock Grid.Column="0" Text="ModelKey:" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <ComboBox Grid.Column="1"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AvailableModelKeys}"
+                      SelectedItem="{Binding SelectedPropModelKey.Value, Mode=TwoWay}" />
+          </Grid>
+
+          <TextBlock Text="250m チャンク番号 (ChunkX, ChunkZ)" FontSize="12" FontWeight="SemiBold" Margin="0,4,0,0" />
+          <Grid ColumnDefinitions="*,8,*">
+            <NumericUpDown Grid.Column="0"
+                           FormatString="0"
+                           Watermark="Chunk X"
+                           controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True"
+                           Value="{Binding PropChunkX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            <NumericUpDown Grid.Column="2"
+                           FormatString="0"
+                           Watermark="Chunk Z"
+                           controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True"
+                           Value="{Binding PropChunkZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+          </Grid>
+
+          <TextBlock Text="ローカル座標 [0..250m 自動正規化] (X, Y, Z)" FontSize="12" FontWeight="SemiBold" Margin="0,4,0,0" />
+          <Grid ColumnDefinitions="*,6,*,6,*">
+            <NumericUpDown Grid.Column="0" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding PropLocalX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            <NumericUpDown Grid.Column="2" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding PropLocalY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            <NumericUpDown Grid.Column="4" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding PropLocalZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+          </Grid>
+
+          <TextBlock Text="回転角 (° RotationX, RotationY, RotationZ)" FontSize="12" FontWeight="SemiBold" Margin="0,4,0,0" />
+          <Grid ColumnDefinitions="*,6,*,6,*">
+            <NumericUpDown Grid.Column="0" Increment="5" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding PropRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            <NumericUpDown Grid.Column="2" Increment="15" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding PropRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            <NumericUpDown Grid.Column="4" Increment="5" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding PropRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+          </Grid>
+
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+            <Button Content="カメラをフォーカス" FontSize="12" Command="{Binding FocusSelectedPropCommand}" />
+            <Button Content="プロップ削除" FontSize="12" Foreground="#FF9999" Command="{Binding DeleteSelectedPropCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Selected Background Model Inspector -->
+      <Border BorderBrush="#685A3A"
+              BorderThickness="1"
+              Background="#242119"
+              CornerRadius="4"
+              Padding="8"
+              IsVisible="{Binding HasSelectedBackground.Value}">
+        <StackPanel Spacing="6">
+          <TextBlock Text="背景モデル (Background.Add)" FontWeight="SemiBold" Foreground="#F3D99B" />
+          <Grid ColumnDefinitions="80,*">
+            <TextBlock Grid.Column="0" Text="Index:" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <TextBlock Grid.Column="1" Text="{Binding SelectedBackgroundIndexText.Value}" FontWeight="SemiBold" />
+          </Grid>
+
+          <Grid ColumnDefinitions="80,*">
+            <TextBlock Grid.Column="0" Text="ModelKey:" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <ComboBox Grid.Column="1"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AvailableModelKeys}"
+                      SelectedItem="{Binding SelectedBackgroundModelKey.Value, Mode=TwoWay}" />
+          </Grid>
+
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+            <Button Content="上へ" FontSize="12" Command="{Binding MoveBackgroundUpCommand}" />
+            <Button Content="下へ" FontSize="12" Command="{Binding MoveBackgroundDownCommand}" />
+            <Button Content="背景モデル削除" FontSize="12" Foreground="#FF9999" Command="{Binding DeleteSelectedBackgroundCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Selected Spline Inspector -->
+      <Border BorderBrush="#3E7A6A"
+              BorderThickness="1"
+              Background="#1A2524"
+              CornerRadius="4"
+              Padding="8"
+              IsVisible="{Binding HasSelectedSpline.Value}">
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding SplineTitleText.Value}" FontWeight="SemiBold" Foreground="#9CE0C6" />
+          <Grid ColumnDefinitions="85,*">
+            <TextBlock Grid.Column="0" Text="表示名 (任意):" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <TextBox Grid.Column="1" Text="{Binding SplineDisplayName.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="例: 本線アプローチ 1" />
+          </Grid>
+
+          <Grid ColumnDefinitions="85,*">
+            <TextBlock Grid.Column="0" Text="Key (必須):" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <TextBox Grid.Column="1" Text="{Binding SplineKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="例: MainRoad1 / 本線_1" />
+          </Grid>
+
+          <Grid ColumnDefinitions="85,*,Auto" ColumnSpacing="4">
+            <TextBlock Grid.Column="0" Text="Template:" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <ComboBox Grid.Column="1"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AvailableSplineTemplateKeys}"
+                      SelectedItem="{Binding SplineTemplateKey.Value, Mode=TwoWay}" />
+            <Button Grid.Column="2" Content="×" Padding="6,2" ToolTip.Tip="テンプレート解除" Command="{Binding ClearSplineTemplateCommand}" />
+          </Grid>
+
+          <TextBlock Text="{Binding SplineOriginSummaryText.Value}" FontSize="11.5" Foreground="#B7D7CC" TextWrapping="Wrap" />
+
+          <!-- ChunkPose Origin controls -->
+          <StackPanel Spacing="6" IsVisible="{Binding IsSplineChunkPoseOrigin.Value}">
+            <TextBlock Text="始点チャンク (ChunkX, ChunkZ)" FontSize="12" FontWeight="SemiBold" Margin="0,2,0,0" />
+            <Grid ColumnDefinitions="*,8,*">
+              <NumericUpDown Grid.Column="0" FormatString="0" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineChunkX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="2" FormatString="0" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineChunkZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+
+            <TextBlock Text="始点ローカル座標 (X, Y, Z)" FontSize="12" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,6,*,6,*">
+              <NumericUpDown Grid.Column="0" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineLocalX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="2" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineLocalY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="4" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineLocalZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+
+            <TextBlock Text="始点回転 (° RotationX, RotationY, RotationZ)" FontSize="12" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,6,*,6,*">
+              <NumericUpDown Grid.Column="0" Increment="5" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="2" Increment="15" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="4" Increment="5" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding SplineRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+            <Button Content="フォーカス" FontSize="12" Padding="8,3" Command="{Binding FocusSelectedSplineCommand}" />
+            <Button Content="削除" FontSize="12" Padding="8,3" Foreground="#FF9999" Command="{Binding DeleteSelectedSplineCommand}" />
+          </StackPanel>
+
+          <Separator Background="#2F4A42" Margin="0,2" />
+
+          <!-- Unified Spline Connection & Extension Group -->
+          <TextBlock Text="接続・延長" FontSize="12.5" FontWeight="SemiBold" Foreground="#B5EFE0" />
+          <Border Background="#151E1E" BorderBrush="#2C423B" BorderThickness="1" CornerRadius="4" Padding="7">
+            <StackPanel Spacing="7">
+              <Button Content="+ Outlet から延長 (IntoSpline)"
+                      FontSize="11.5"
+                      Padding="8,3"
+                      HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Center"
+                      Command="{Binding ExtendSplineFromOutletCommand}" />
+
+              <Separator Background="#253833" />
+
+              <TextBlock Text="Outlet からジャンクション接続 (IntoJunction)" FontSize="11.5" FontWeight="SemiBold" />
+              <Grid ColumnDefinitions="*,6,*" ColumnSpacing="4">
+                <ComboBox Grid.Column="0"
+                          FontSize="11"
+                          HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding AvailableJunctionTemplateKeys}"
+                          SelectedItem="{Binding SelectedChainJunctionTemplateKey.Value, Mode=TwoWay}" />
+                <ComboBox Grid.Column="2"
+                          FontSize="11"
+                          HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding CompatibleChainJunctionPorts}"
+                          SelectedItem="{Binding SelectedChainJunctionPortKey.Value, Mode=TwoWay}" />
+              </Grid>
+              <Button Content="+ ジャンクションへ接続 (IntoJunction)"
+                      FontSize="11.5"
+                      Padding="8,3"
+                      IsEnabled="{Binding CanExtendJunctionFromSplineOutlet.Value}"
+                      Command="{Binding ExtendJunctionFromSplineOutletCommand}" />
+
+              <Separator Background="#253833" />
+
+              <TextBlock Text="ポート接続 / 終端ベジェ接続" FontSize="11.5" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding ConnectStatusText.Value}" FontSize="11.5" Foreground="#8AD0E6" TextWrapping="Wrap" />
+
+              <TextBlock Text="互換ポート候補 (トポロジー循環・車線不一致除外済):" FontSize="11" Opacity="0.78" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                <ComboBox Grid.Column="0"
+                          HorizontalAlignment="Stretch"
+                          FontSize="11"
+                          IsEnabled="{Binding HasCompatibleConnectTargets.Value}"
+                          ItemsSource="{Binding CompatibleConnectTargets}"
+                          SelectedItem="{Binding SelectedConnectTarget.Value, Mode=TwoWay}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="val:CompatiblePortCandidate">
+                      <TextBlock Text="{Binding DisplayLabel}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <ToggleButton Grid.Column="1"
+                              Classes="inspector-choice"
+                              Content="3Dで指定"
+                              ToolTip.Tip="3D ビューで接続先ポートを 1 クリックして接続します"
+                              IsChecked="{Binding IsPickingSplineConnectTargetIn3D.Value, Mode=OneWay}"
+                              Command="{Binding ToggleSplineConnectPickIn3DCommand}" />
+              </Grid>
+
+              <Grid ColumnDefinitions="*,8,*" ColumnSpacing="4">
+                <NumericUpDown Grid.Column="0"
+                               FontSize="11"
+                               Watermark="HandleScale"
+                               Minimum="0.05"
+                               Maximum="5"
+                               Increment="0.1"
+                               FormatString="0.##"
+                               Value="{Binding ConnectHandleScale.Value, Mode=TwoWay}" />
+                <TextBox Grid.Column="2"
+                         FontSize="11"
+                         Watermark="Anchor ID (任意)"
+                         Text="{Binding ConnectOutputAnchorId.Value, Mode=TwoWay}" />
+              </Grid>
+
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Content="ポート接続"
+                        FontSize="11"
+                        Padding="8,3"
+                        IsEnabled="{Binding HasCompatibleConnectTargets.Value}"
+                        Command="{Binding ApplyConnectBezierCommand}" />
+                <Button Content="接続解除"
+                        FontSize="11"
+                        Padding="8,3"
+                        IsEnabled="{Binding HasActiveConnectBezier.Value}"
+                        Command="{Binding ClearConnectBezierCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Separator Background="#2F4A42" Margin="0,2" />
+
+          <!-- PreBuildUserCode -->
+          <TextBlock Text="事前ユーザーコード (// &lt;user-prebuild&gt;)" FontSize="12" FontWeight="SemiBold" />
+          <controls:CSharpCodeEditor Height="84"
+                                     Text="{Binding SplinePreBuildUserCode.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Selected Junction Inspector -->
+      <Border BorderBrush="#7A5B3E"
+              BorderThickness="1"
+              Background="#261F1A"
+              CornerRadius="4"
+              Padding="8"
+              IsVisible="{Binding HasSelectedJunction.Value}">
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding JunctionTitleText.Value}" FontWeight="SemiBold" Foreground="#F6C48B" />
+          <Grid ColumnDefinitions="85,*">
+            <TextBlock Grid.Column="0" Text="表示名 (任意):" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <TextBox Grid.Column="1" Text="{Binding JunctionDisplayName.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="例: 北口交差点" />
+          </Grid>
+
+          <Grid ColumnDefinitions="85,*">
+            <TextBlock Grid.Column="0" Text="Key (必須):" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <TextBox Grid.Column="1" Text="{Binding JunctionKey.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="例: MainJunction1 / 交差点_1" />
+          </Grid>
+
+          <Grid ColumnDefinitions="85,*">
+            <TextBlock Grid.Column="0" Text="Template:" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+            <ComboBox Grid.Column="1"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AvailableJunctionTemplateKeys}"
+                      SelectedItem="{Binding JunctionTemplateKey.Value, Mode=TwoWay}" />
+          </Grid>
+
+          <TextBlock Text="{Binding JunctionOriginSummaryText.Value}" FontSize="11.5" Foreground="#E6C9A8" TextWrapping="Wrap" />
+
+          <StackPanel Spacing="6" IsVisible="{Binding IsJunctionChunkPoseOrigin.Value}">
+            <TextBlock Text="原点チャンク (ChunkX, ChunkZ)" FontSize="12" FontWeight="SemiBold" Margin="0,2,0,0" />
+            <Grid ColumnDefinitions="*,8,*">
+              <NumericUpDown Grid.Column="0" FormatString="0" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionChunkX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="2" FormatString="0" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionChunkZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+
+            <TextBlock Text="原点ローカル座標 (X, Y, Z)" FontSize="12" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,6,*,6,*">
+              <NumericUpDown Grid.Column="0" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionLocalX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="2" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionLocalY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="4" Increment="0.5" FormatString="0.###" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionLocalZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+
+            <TextBlock Text="原点回転 (° RotationX, RotationY, RotationZ)" FontSize="12" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,6,*,6,*">
+              <NumericUpDown Grid.Column="0" Increment="5" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionRotX.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="2" Increment="15" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionRotY.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              <NumericUpDown Grid.Column="4" Increment="5" FormatString="0.##" ShowButtonSpinner="False" controls:NumericUpDownCommitBehavior.CommitOnLostFocusOrEnter="True" Value="{Binding JunctionRotZ.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+            </Grid>
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+            <Button Content="カメラをフォーカス" FontSize="12" Command="{Binding FocusSelectedJunctionCommand}" />
+            <Button Content="ジャンクション削除" FontSize="12" Foreground="#FF9999" Command="{Binding DeleteSelectedJunctionCommand}" />
+          </StackPanel>
+
+          <Separator Background="#53402F" Margin="0,2" />
+
+          <!-- Junction Port Chaining & Direct Port Connect (3-choice UI) -->
+          <TextBlock Text="ポート接続・延長" FontSize="12.5" FontWeight="SemiBold" Foreground="#F6C48B" />
+          <Grid ColumnDefinitions="55,*">
+            <TextBlock Grid.Column="0" Text="Port:" VerticalAlignment="Center" FontSize="11.5" Opacity="0.85" />
+            <ComboBox Grid.Column="1"
+                      FontSize="11.5"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AvailableJunctionPortKeys}"
+                      SelectedItem="{Binding SelectedJunctionPortKey.Value, Mode=TwoWay}" />
+          </Grid>
+          <TextBlock Text="{Binding SelectedJunctionPortStatusText.Value}"
+                     FontSize="11"
+                     Foreground="#F6C48B"
+                     TextWrapping="Wrap" />
+
+          <UniformGrid Columns="3" Margin="0,2,0,0">
+            <ToggleButton Classes="inspector-choice"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center"
+                          Content="スプライン延長"
+                          IsChecked="{Binding IsJunctionExtendSplineMode.Value, Mode=OneWay}"
+                          Command="{Binding SelectJunctionExtendSplineModeCommand}" />
+            <ToggleButton Classes="inspector-choice"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center"
+                          Content="ジャンクション連結"
+                          IsChecked="{Binding IsJunctionChainJunctionMode.Value, Mode=OneWay}"
+                          Command="{Binding SelectJunctionChainJunctionModeCommand}" />
+            <ToggleButton Classes="inspector-choice"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center"
+                          Content="ポート接続"
+                          IsChecked="{Binding IsJunctionExplicitConnectMode.Value, Mode=OneWay}"
+                          Command="{Binding SelectJunctionExplicitConnectModeCommand}" />
+          </UniformGrid>
+
+          <Border Background="#1D1712" BorderBrush="#493728" BorderThickness="1" CornerRadius="4" Padding="7">
+            <StackPanel Spacing="6">
+              <!-- Choice 1: Extend New Spline (IntoSpline) -->
+              <StackPanel Spacing="5" IsVisible="{Binding IsJunctionExtendSplineMode.Value}">
+                <TextBlock Text="選択ポートから新規スプラインを延長します (IntoSpline):" FontSize="11" Opacity="0.8" TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                  <ComboBox Grid.Column="0"
+                            FontSize="11"
+                            HorizontalAlignment="Stretch"
+                            IsEnabled="{Binding CanExtendSplineFromJunctionPort.Value}"
+                            ItemsSource="{Binding CompatibleSplineTemplatesForJunctionPort}"
+                            SelectedItem="{Binding SelectedChainSplineTemplateKey.Value, Mode=TwoWay}" />
+                  <Button Grid.Column="1"
+                          Content="+ スプライン延長"
+                          FontSize="11"
+                          Padding="8,3"
+                          IsEnabled="{Binding CanExtendSplineFromJunctionPort.Value}"
+                          Command="{Binding ExtendSplineFromJunctionPortCommand}" />
+                </Grid>
+              </StackPanel>
+
+              <!-- Choice 2: Chain New Junction (IntoJunction) -->
+              <StackPanel Spacing="5" IsVisible="{Binding IsJunctionChainJunctionMode.Value}">
+                <TextBlock Text="選択ポートに別のジャンクションを連結生成します (IntoJunction):" FontSize="11" Opacity="0.8" TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="*,6,*,Auto" ColumnSpacing="4">
+                  <ComboBox Grid.Column="0"
+                            FontSize="11"
+                            HorizontalAlignment="Stretch"
+                            IsEnabled="{Binding IsSelectedJunctionPortFree.Value}"
+                            ItemsSource="{Binding AvailableJunctionTemplateKeys}"
+                            SelectedItem="{Binding SelectedJunctionChainTargetTemplateKey.Value, Mode=TwoWay}" />
+                  <ComboBox Grid.Column="2"
+                            FontSize="11"
+                            HorizontalAlignment="Stretch"
+                            IsEnabled="{Binding CanExtendJunctionFromJunctionPort.Value}"
+                            ItemsSource="{Binding CompatibleJunctionPortsForJunctionChain}"
+                            SelectedItem="{Binding SelectedJunctionChainTargetPortKey.Value, Mode=TwoWay}" />
+                  <Button Grid.Column="3"
+                          Content="+ 連結"
+                          FontSize="11"
+                          Padding="8,3"
+                          IsEnabled="{Binding CanExtendJunctionFromJunctionPort.Value}"
+                          Command="{Binding ExtendJunctionFromJunctionPortCommand}" />
+                </Grid>
+              </StackPanel>
+
+              <!-- Choice 3: Direct Connect to Existing Port -->
+              <StackPanel Spacing="5" IsVisible="{Binding IsJunctionExplicitConnectMode.Value}">
+                <TextBlock Text="既存の配置済みポートを直接指定して接続または解除します:" FontSize="11" Opacity="0.8" TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                  <ComboBox Grid.Column="0"
+                            FontSize="11"
+                            HorizontalAlignment="Stretch"
+                            IsEnabled="{Binding HasCompatibleExplicitConnectTargets.Value}"
+                            ItemsSource="{Binding CompatibleExplicitConnectTargets}"
+                            SelectedItem="{Binding SelectedExplicitConnectTarget.Value, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="val:CompatiblePortCandidate">
+                        <TextBlock Text="{Binding DisplayLabel}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <ToggleButton Grid.Column="1"
+                                Classes="inspector-choice"
+                                Content="3Dで指定"
+                                ToolTip.Tip="3D ビューで接続先ポートを 1 クリックして接続します"
+                                IsEnabled="{Binding IsSelectedJunctionPortFree.Value}"
+                                IsChecked="{Binding IsPickingJunctionConnectTargetIn3D.Value, Mode=OneWay}"
+                                Command="{Binding ToggleJunctionConnectPickIn3DCommand}" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="ポート接続"
+                          FontSize="11"
+                          Padding="8,3"
+                          IsEnabled="{Binding HasCompatibleExplicitConnectTargets.Value}"
+                          Command="{Binding AddExplicitPortConnectionCommand}" />
+                  <Button Content="接続解除"
+                          FontSize="11"
+                          Padding="8,3"
+                          IsEnabled="{Binding HasActiveExplicitConnectionOnSelectedPort.Value}"
+                          Command="{Binding DisconnectSelectedJunctionPortCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Separator Background="#53402F" Margin="0,2" />
+
+          <!-- PathOverrides (TrafficDensityFactor) -->
+          <TextBlock Text="パス上書き (TrafficDensityFactor)" FontSize="12" FontWeight="SemiBold" />
+          <ComboBox HorizontalAlignment="Stretch"
+                    FontSize="11.5"
+                    ItemsSource="{Binding JunctionPathKeys}"
+                    SelectedItem="{Binding SelectedJunctionPathKey.Value, Mode=TwoWay}" />
+          <TextBlock Text="{Binding JunctionPathOverrideStatusText.Value}" FontSize="11" Opacity="0.8" />
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+            <NumericUpDown Grid.Column="0"
+                           FontSize="11.5"
+                           Minimum="0"
+                           Maximum="10"
+                           Increment="0.1"
+                           FormatString="0.##"
+                           ShowButtonSpinner="False"
+                           Value="{Binding JunctionPathTrafficDensity.Value, Mode=TwoWay}" />
+            <Button Grid.Column="1" Content="適用" FontSize="11" Padding="7,3" Command="{Binding ApplyJunctionPathOverrideCommand}" />
+            <Button Grid.Column="2" Content="解除" FontSize="11" Padding="7,3" Command="{Binding RemoveJunctionPathOverrideCommand}" />
+          </Grid>
+
+          <Separator Background="#53402F" Margin="0,2" />
+
+          <!-- CurveOverrides (PutExtrusion) -->
+          <TextBlock Text="補助曲線押し出し上書き (CurveOverrides)" FontSize="12" FontWeight="SemiBold" />
+          <ComboBox HorizontalAlignment="Stretch"
+                    FontSize="11.5"
+                    ItemsSource="{Binding JunctionCurveKeys}"
+                    SelectedItem="{Binding SelectedJunctionCurveKey.Value, Mode=TwoWay}" />
+          <ListBox MaxHeight="90"
+                   ItemsSource="{Binding JunctionCurveExtrusions}"
+                   SelectedIndex="{Binding SelectedJunctionCurveExtrusionIndex.Value, Mode=TwoWay}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="dockvm:InspectorListEntry">
+                <TextBlock Text="{Binding DisplayLabel}" FontSize="11" TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <Grid ColumnDefinitions="*,60,60" ColumnSpacing="4">
+            <ComboBox Grid.Column="0"
+                      FontSize="11"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AvailableCrossSectionKeys}"
+                      SelectedItem="{Binding NewCurveExtrusionSectionKey.Value, Mode=TwoWay}" />
+            <NumericUpDown Grid.Column="1" FontSize="11" FormatString="0.##" ShowButtonSpinner="False" Watermark="From" Value="{Binding NewCurveExtrusionFrom.Value, Mode=TwoWay}" />
+            <NumericUpDown Grid.Column="2" FontSize="11" FormatString="0.##" ShowButtonSpinner="False" Watermark="To" Value="{Binding NewCurveExtrusionTo.Value, Mode=TwoWay}" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Content="+ 押し出し追加" FontSize="11" Padding="7,3" Command="{Binding AddJunctionCurveExtrusionCommand}" />
+            <Button Content="選択削除" FontSize="11" Padding="7,3" Command="{Binding RemoveJunctionCurveExtrusionCommand}" />
+          </StackPanel>
+
+          <Separator Background="#53402F" Margin="0,2" />
+
+          <!-- Static Instance Props -->
+          <TextBlock Text="インスタンス静的プロップ (Props)" FontSize="12" FontWeight="SemiBold" />
+          <ListBox MaxHeight="85"
+                   ItemsSource="{Binding JunctionStaticProps}"
+                   SelectedIndex="{Binding SelectedJunctionStaticPropIndex.Value, Mode=TwoWay}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="dockvm:InspectorListEntry">
+                <TextBlock Text="{Binding DisplayLabel}" FontSize="11" TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <ComboBox HorizontalAlignment="Stretch"
+                    FontSize="11"
+                    ItemsSource="{Binding AvailableModelKeys}"
+                    SelectedItem="{Binding NewJunctionStaticPropModelKey.Value, Mode=TwoWay}" />
+          <Grid ColumnDefinitions="*,6,*,6,*">
+            <NumericUpDown Grid.Column="0" FontSize="11" FormatString="0.##" ShowButtonSpinner="False" Watermark="X" Value="{Binding NewJunctionStaticPropX.Value, Mode=TwoWay}" />
+            <NumericUpDown Grid.Column="2" FontSize="11" FormatString="0.##" ShowButtonSpinner="False" Watermark="Y" Value="{Binding NewJunctionStaticPropY.Value, Mode=TwoWay}" />
+            <NumericUpDown Grid.Column="4" FontSize="11" FormatString="0.##" ShowButtonSpinner="False" Watermark="Z" Value="{Binding NewJunctionStaticPropZ.Value, Mode=TwoWay}" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Content="+ プロップ追加" FontSize="11" Padding="7,3" Command="{Binding AddJunctionStaticPropCommand}" />
+            <Button Content="選択削除" FontSize="11" Padding="7,3" Command="{Binding RemoveJunctionStaticPropCommand}" />
+          </StackPanel>
+
+          <Separator Background="#53402F" Margin="0,2" />
+
+          <!-- PreBuildUserCode -->
+          <TextBlock Text="事前ユーザーコード (// &lt;user-prebuild&gt;)" FontSize="12" FontWeight="SemiBold" />
+          <controls:CSharpCodeEditor Height="84"
+                                     Text="{Binding JunctionPreBuildUserCode.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="未選択 (3Dビューポートまたはシーン階層からプロップ / スプライン / ジャンクションを選択)"
+                 FontSize="12"
+                 Opacity="0.65"
+                 TextWrapping="Wrap"
+                 IsVisible="{Binding !HasAnySelection.Value}" />
+
+      <!-- Explicit Port Connections -->
+      <StackPanel Spacing="4" IsVisible="{Binding HasExplicitConnections.Value}">
+        <Separator Background="#3F3F46" Margin="0,2" />
+        <TextBlock Text="ポート接続一覧 (直結リンク)" FontWeight="SemiBold" />
+        <ListBox MaxHeight="110"
+                 ItemsSource="{Binding ExplicitConnections}"
+                 SelectedIndex="{Binding SelectedExplicitConnectionIndex.Value, Mode=TwoWay}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="dockvm:InspectorListEntry">
+              <TextBlock Text="{Binding DisplayLabel}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <Button Content="選択中の接続を解除"
+                FontSize="11.5"
+                Padding="8,3"
+                Command="{Binding RemoveExplicitPortConnectionCommand}" />
+      </StackPanel>
+
+      <Separator Background="#3F3F46" Margin="0,2" />
+
+      <TextBlock Text="ワークスペース概要" FontWeight="SemiBold" />
+      <Border BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="4" Padding="8">
+        <TextBlock Text="{Binding SummaryText.Value}" TextWrapping="Wrap" />
+      </Border>
+
+      <TextBlock Text="未保存の変更" FontWeight="SemiBold" />
+      <ItemsControl ItemsSource="{Binding DirtyFilesList}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Text="{Binding}" FontSize="12" Foreground="#FFD480" TextWrapping="Wrap" Margin="2,1" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="上書き保護ファイル" FontWeight="SemiBold" />
+      <ItemsControl ItemsSource="{Binding ProtectedFilesList}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Text="{Binding}" FontSize="12" Foreground="#FF9999" TextWrapping="Wrap" Margin="2,1" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
