@@ -513,9 +513,16 @@ internal static class RoslynCsxHelpers
             FormatNumber(pose.RotationZ));
     }
 
+    private static readonly HashSet<string> WindowsReservedFileNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    };
+
     public static string SanitizeIdentifier(string raw)
     {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new();
         foreach (char c in raw)
         {
             if (char.IsLetterOrDigit(c) || c == '_')
@@ -534,6 +541,52 @@ internal static class RoslynCsxHelpers
         }
 
         return sb.ToString();
+    }
+
+    public static string SanitizeFileName(string? raw, string fallback = "Template")
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return fallback;
+        }
+
+        string trimmed = raw.Trim();
+        ReadOnlySpan<char> invalidChars = System.IO.Path.GetInvalidFileNameChars();
+        StringBuilder sb = new(trimmed.Length);
+        foreach (char c in trimmed)
+        {
+            if (char.IsControl(c)
+                || c == '/'
+                || c == '\\'
+                || c == ':'
+                || c == '*'
+                || c == '?'
+                || c == '"'
+                || c == '<'
+                || c == '>'
+                || c == '|'
+                || 0 <= invalidChars.IndexOf(c))
+            {
+                sb.Append('_');
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+
+        string cleaned = sb.ToString().TrimEnd('.', ' ');
+        if (string.IsNullOrEmpty(cleaned) || cleaned == "." || cleaned == "..")
+        {
+            return fallback;
+        }
+
+        if (WindowsReservedFileNames.Contains(cleaned))
+        {
+            return $"{cleaned}_";
+        }
+
+        return cleaned;
     }
 
     public static string DedentOneLevel(string text)

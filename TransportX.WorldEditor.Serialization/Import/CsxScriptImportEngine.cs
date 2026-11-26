@@ -776,7 +776,7 @@ internal sealed class CsxScriptImportEngine
                         {
                             Key = splineKey,
                             OutletLayoutKey = layoutKey,
-                            RelativePath = $"Templates/Splines/{RoslynCsxHelpers.SanitizeIdentifier(splineKey)}.csx",
+                            RelativePath = Storage.WorldProjectStorage.BuildSplineTemplateRelativePath(splineKey),
                         };
                         TargetProject.SplineTemplates[doc.Key] = doc;
 
@@ -797,7 +797,7 @@ internal sealed class CsxScriptImportEngine
                         JunctionTemplateDocument doc = new()
                         {
                             Key = juncKey,
-                            RelativePath = $"Templates/Junctions/{RoslynCsxHelpers.SanitizeIdentifier(juncKey)}.csx",
+                            RelativePath = Storage.WorldProjectStorage.BuildJunctionTemplateRelativePath(juncKey),
                         };
                         TargetProject.JunctionTemplates[doc.Key] = doc;
 

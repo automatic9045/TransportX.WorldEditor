@@ -320,7 +320,7 @@ public static class WorldProjectImporter
 
         foreach (Core.Models.Templates.SplineTemplateDocument st in project.SplineTemplates.Values)
         {
-            string sanitized = RoslynCsxHelpers.SanitizeIdentifier(st.Key);
+            string sanitized = RoslynCsxHelpers.SanitizeFileName(st.Key, "Spline");
             string candidate = $"Templates/Splines/{sanitized}.csx";
             int suffix = 2;
             while (!usedRelPaths.Add(candidate))
@@ -334,7 +334,7 @@ public static class WorldProjectImporter
 
         foreach (Core.Models.Templates.JunctionTemplateDocument jt in project.JunctionTemplates.Values)
         {
-            string sanitized = RoslynCsxHelpers.SanitizeIdentifier(jt.Key);
+            string sanitized = RoslynCsxHelpers.SanitizeFileName(jt.Key, "Junction");
             string candidate = $"Templates/Junctions/{sanitized}.csx";
             int suffix = 2;
             while (!usedRelPaths.Add(candidate))

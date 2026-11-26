@@ -364,7 +364,7 @@ public static class WorldProjectStorage
         {
             if (string.IsNullOrEmpty(splineTpl.RelativePath))
             {
-                splineTpl.RelativePath = $"Templates/Splines/{RoslynCsxHelpers.SanitizeIdentifier(splineTpl.Key)}.csx";
+                splineTpl.RelativePath = BuildSplineTemplateRelativePath(splineTpl.Key);
             }
 
             list.Add(new WorldFileTarget(WorldFileKind.SplineTemplateCsx, WorldProject.NormalizeRelativePath(splineTpl.RelativePath)));
@@ -374,7 +374,7 @@ public static class WorldProjectStorage
         {
             if (string.IsNullOrEmpty(junctionTpl.RelativePath))
             {
-                junctionTpl.RelativePath = $"Templates/Junctions/{RoslynCsxHelpers.SanitizeIdentifier(junctionTpl.Key)}.csx";
+                junctionTpl.RelativePath = BuildJunctionTemplateRelativePath(junctionTpl.Key);
             }
 
             list.Add(new WorldFileTarget(WorldFileKind.JunctionTemplateCsx, WorldProject.NormalizeRelativePath(junctionTpl.RelativePath)));
@@ -521,11 +521,17 @@ public static class WorldProjectStorage
         }
     }
 
+    public static string BuildSplineTemplateRelativePath(string key) =>
+        $"Templates/Splines/{RoslynCsxHelpers.SanitizeFileName(key, "Spline")}.csx";
+
+    public static string BuildJunctionTemplateRelativePath(string key) =>
+        $"Templates/Junctions/{RoslynCsxHelpers.SanitizeFileName(key, "Junction")}.csx";
+
     public static string GetSplineTemplateRelativePath(SplineTemplateDocument splineTpl)
     {
         ArgumentNullException.ThrowIfNull(splineTpl);
         return string.IsNullOrEmpty(splineTpl.RelativePath)
-            ? $"Templates/Splines/{RoslynCsxHelpers.SanitizeIdentifier(splineTpl.Key)}.csx"
+            ? BuildSplineTemplateRelativePath(splineTpl.Key)
             : WorldProject.NormalizeRelativePath(splineTpl.RelativePath);
     }
 
@@ -533,7 +539,7 @@ public static class WorldProjectStorage
     {
         ArgumentNullException.ThrowIfNull(junctionTpl);
         return string.IsNullOrEmpty(junctionTpl.RelativePath)
-            ? $"Templates/Junctions/{RoslynCsxHelpers.SanitizeIdentifier(junctionTpl.Key)}.csx"
+            ? BuildJunctionTemplateRelativePath(junctionTpl.Key)
             : WorldProject.NormalizeRelativePath(junctionTpl.RelativePath);
     }
 

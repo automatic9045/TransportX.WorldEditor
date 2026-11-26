@@ -1809,7 +1809,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
             }
         }
 
-        string relPath = $"Templates/Splines/{key}.csx";
+        string relPath = Serialization.Storage.WorldProjectStorage.BuildSplineTemplateRelativePath(key);
         if (Workspace.AddNewSplineTemplate(key, relPath))
         {
             NewResourceKey.Value = string.Empty;

@@ -3351,7 +3351,7 @@ public sealed class WorldWorkspaceService : IDisposable
         }
 
         string uniqueKey = ResolveUniqueResourceKey(desiredKey, "Junction", k => project.JunctionTemplates.ContainsKey(k));
-        string relPath = $"Templates/Junctions/{uniqueKey}.csx";
+        string relPath = WorldProjectStorage.BuildJunctionTemplateRelativePath(uniqueKey);
         if (!AddNewJunctionTemplate(uniqueKey, relPath))
         {
             return false;

@@ -100,16 +100,18 @@ public sealed class WorldProjectImporterTests
             Assert.True(File.Exists(Path.Combine(destWorldDir, "Templates", "Load.csx")));
             Assert.True(File.Exists(Path.Combine(destWorldDir, "Templates", "Splines", "Spline1.csx")));
             Assert.True(File.Exists(Path.Combine(destWorldDir, "Templates", "Splines", "Spline2.csx")));
-            Assert.True(File.Exists(Path.Combine(destWorldDir, "Templates", "Junctions", "_3Forked1.csx")));
+            Assert.True(File.Exists(Path.Combine(destWorldDir, "Templates", "Junctions", "3Forked1.csx")));
+            Assert.False(File.Exists(Path.Combine(destWorldDir, "Templates", "Junctions", "_3Forked1.csx")));
             Assert.True(File.Exists(Path.Combine(destWorldDir, "Templates", "Junctions", "DeadEnd1.csx")));
             Assert.False(File.Exists(Path.Combine(destWorldDir, "Templates.csx")));
 
             string templatesLoadText = File.ReadAllText(Path.Combine(destWorldDir, "Templates", "Load.csx"));
             Assert.Contains("#load \"../__Editor.csx\"", templatesLoadText);
             Assert.Contains("#load \"Splines/Spline1.csx\"", templatesLoadText);
+            Assert.Contains("#load \"Junctions/3Forked1.csx\"", templatesLoadText);
             Assert.Contains("#load \"Junctions/DeadEnd1.csx\"", templatesLoadText);
 
-            string threeForked1Text = File.ReadAllText(Path.Combine(destWorldDir, "Templates", "Junctions", "_3Forked1.csx"));
+            string threeForked1Text = File.ReadAllText(Path.Combine(destWorldDir, "Templates", "Junctions", "3Forked1.csx"));
             Assert.Contains("// <editor-generated version=\"1\">", threeForked1Text);
             Assert.Contains("SignalController(\"4Forked1\")", threeForked1Text);
             Assert.Contains("PutSignalProp(", threeForked1Text);
@@ -376,6 +378,16 @@ public sealed class WorldProjectImporterTests
         });
 
         Assert.Null(captured);
+    }
+
+    [Fact]
+    public void BuildTemplateRelativePath_PreservesLeadingDigits_AndSanitizesInvalidChars()
+    {
+        Assert.Equal("Templates/Junctions/3Forked1.csx", WorldProjectStorage.BuildJunctionTemplateRelativePath("3Forked1"));
+        Assert.Equal("Templates/Splines/2LaneRoad.csx", WorldProjectStorage.BuildSplineTemplateRelativePath("2LaneRoad"));
+        Assert.Equal("Templates/Splines/3_Road_A_.csx", WorldProjectStorage.BuildSplineTemplateRelativePath("3:Road/A?"));
+        Assert.Equal("Templates/Junctions/CON_.csx", WorldProjectStorage.BuildJunctionTemplateRelativePath("CON"));
+        Assert.Equal("Templates/Junctions/Junction.csx", WorldProjectStorage.BuildJunctionTemplateRelativePath("..."));
     }
 
     private sealed class DummyGraphicsClient : IGraphicsClient
