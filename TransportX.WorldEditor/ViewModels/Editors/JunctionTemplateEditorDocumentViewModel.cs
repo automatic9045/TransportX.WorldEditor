@@ -1752,28 +1752,19 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
         PathSegHasTargetPose.Value = kind == JunctionCurveSegmentKind.StraightTo || kind == JunctionCurveSegmentKind.BezierTo;
         PathSegIsBezier.Value = kind == JunctionCurveSegmentKind.BezierTo || kind == JunctionCurveSegmentKind.BezierToEnd;
 
-        string? newAnchor = string.IsNullOrWhiteSpace(PathSegAnchorId.Value) ? null : PathSegAnchorId.Value.Trim();
         JunctionTemplateDocument? doc = GetDocument();
-        if (!string.IsNullOrEmpty(newAnchor)
-            && doc is not null
-            && 0 <= pRow.Index
-            && pRow.Index < doc.Paths.Count
-            && HasDuplicateAnchorInPath(doc.Paths[pRow.Index], newAnchor, isWidthSegment: false, excludeIndex: sRow.Index))
+        string? oldAnchor = doc is not null && 0 <= pRow.Index && pRow.Index < doc.Paths.Count
+            && 0 <= sRow.Index && sRow.Index < doc.Paths[pRow.Index].Segments.Count
+            ? doc.Paths[pRow.Index].Segments[sRow.Index].OutputAnchorId
+            : null;
+        if (!TryValidateJunctionAnchorEdit(
+                PathSegAnchorId,
+                oldAnchor,
+                candidate => doc is not null && 0 <= pRow.Index && pRow.Index < doc.Paths.Count
+                    && HasDuplicateAnchorInPath(doc.Paths[pRow.Index], candidate, isWidthSegment: false, excludeIndex: sRow.Index),
+                $"進路パス '{pRow.Key}' 内でアンカー",
+                out string? newAnchor))
         {
-            string? oldAnchor = 0 <= sRow.Index && sRow.Index < doc.Paths[pRow.Index].Segments.Count
-                ? doc.Paths[pRow.Index].Segments[sRow.Index].OutputAnchorId
-                : null;
-            IsSyncing = true;
-            try
-            {
-                PathSegAnchorId.Value = oldAnchor ?? string.Empty;
-            }
-            finally
-            {
-                IsSyncing = false;
-            }
-
-            Workspace.LastStatusMessage.Value = $"進路パス '{pRow.Key}' 内でアンカー '{newAnchor}' が重複しています。別の名前を指定してください。";
             return;
         }
 
@@ -1869,28 +1860,19 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
         }
 
         WidthIsTransition.Value = WidthKind.Value == JunctionWidthSegmentKind.TransitionTo;
-        string? newAnchor = string.IsNullOrWhiteSpace(WidthAnchorId.Value) ? null : WidthAnchorId.Value.Trim();
         JunctionTemplateDocument? doc = GetDocument();
-        if (!string.IsNullOrEmpty(newAnchor)
-            && doc is not null
-            && 0 <= pRow.Index
-            && pRow.Index < doc.Paths.Count
-            && HasDuplicateAnchorInPath(doc.Paths[pRow.Index], newAnchor, isWidthSegment: true, excludeIndex: wRow.Index))
+        string? oldAnchor = doc is not null && 0 <= pRow.Index && pRow.Index < doc.Paths.Count
+            && 0 <= wRow.Index && wRow.Index < doc.Paths[pRow.Index].WidthSegments.Count
+            ? doc.Paths[pRow.Index].WidthSegments[wRow.Index].OutputAnchorId
+            : null;
+        if (!TryValidateJunctionAnchorEdit(
+                WidthAnchorId,
+                oldAnchor,
+                candidate => doc is not null && 0 <= pRow.Index && pRow.Index < doc.Paths.Count
+                    && HasDuplicateAnchorInPath(doc.Paths[pRow.Index], candidate, isWidthSegment: true, excludeIndex: wRow.Index),
+                $"進路パス '{pRow.Key}' 内でアンカー",
+                out string? newAnchor))
         {
-            string? oldAnchor = 0 <= wRow.Index && wRow.Index < doc.Paths[pRow.Index].WidthSegments.Count
-                ? doc.Paths[pRow.Index].WidthSegments[wRow.Index].OutputAnchorId
-                : null;
-            IsSyncing = true;
-            try
-            {
-                WidthAnchorId.Value = oldAnchor ?? string.Empty;
-            }
-            finally
-            {
-                IsSyncing = false;
-            }
-
-            Workspace.LastStatusMessage.Value = $"進路パス '{pRow.Key}' 内でアンカー '{newAnchor}' が重複しています。別の名前を指定してください。";
             return;
         }
 
@@ -2238,28 +2220,19 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
         }
 
         CurveSegIsBezier.Value = CurveSegKind.Value == JunctionCurveSegmentKind.BezierTo;
-        string? newAnchor = string.IsNullOrWhiteSpace(CurveSegAnchorId.Value) ? null : CurveSegAnchorId.Value.Trim();
         JunctionTemplateDocument? doc = GetDocument();
-        if (!string.IsNullOrEmpty(newAnchor)
-            && doc is not null
-            && 0 <= cRow.Index
-            && cRow.Index < doc.Curves.Count
-            && HasDuplicateAnchorInCurve(doc.Curves[cRow.Index], newAnchor, excludeIndex: sRow.Index))
+        string? oldAnchor = doc is not null && 0 <= cRow.Index && cRow.Index < doc.Curves.Count
+            && 0 <= sRow.Index && sRow.Index < doc.Curves[cRow.Index].Segments.Count
+            ? doc.Curves[cRow.Index].Segments[sRow.Index].OutputAnchorId
+            : null;
+        if (!TryValidateJunctionAnchorEdit(
+                CurveSegAnchorId,
+                oldAnchor,
+                candidate => doc is not null && 0 <= cRow.Index && cRow.Index < doc.Curves.Count
+                    && HasDuplicateAnchorInCurve(doc.Curves[cRow.Index], candidate, excludeIndex: sRow.Index),
+                $"補助曲線 '{cRow.Key}' 内でアンカー",
+                out string? newAnchor))
         {
-            string? oldAnchor = 0 <= sRow.Index && sRow.Index < doc.Curves[cRow.Index].Segments.Count
-                ? doc.Curves[cRow.Index].Segments[sRow.Index].OutputAnchorId
-                : null;
-            IsSyncing = true;
-            try
-            {
-                CurveSegAnchorId.Value = oldAnchor ?? string.Empty;
-            }
-            finally
-            {
-                IsSyncing = false;
-            }
-
-            Workspace.LastStatusMessage.Value = $"補助曲線 '{cRow.Key}' 内でアンカー '{newAnchor}' が重複しています。別の名前を指定してください。";
             return;
         }
 
@@ -2286,6 +2259,48 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
                 }
             },
             $"JunctionTemplate.{TemplateKey}.CurveSeg.{cRow.Index}.{sRow.Index}");
+    }
+
+    private bool TryValidateJunctionAnchorEdit(
+        BindableReactiveProperty<string> prop,
+        string? oldAnchor,
+        Func<string, bool> isDuplicate,
+        string scopePrefix,
+        out string? newAnchor)
+    {
+        newAnchor = string.IsNullOrWhiteSpace(prop.Value) ? null : prop.Value.Trim();
+        if (string.IsNullOrEmpty(newAnchor))
+        {
+            return true;
+        }
+
+        string? rejectionMessage = null;
+        if (!CSharpIdentifierUtilities.TryValidateAnchorId(newAnchor, out string formatError))
+        {
+            rejectionMessage = formatError;
+        }
+        else if (isDuplicate(newAnchor))
+        {
+            rejectionMessage = $"{scopePrefix} '{newAnchor}' が重複しています。別の名前を指定してください。";
+        }
+
+        if (rejectionMessage is null)
+        {
+            return true;
+        }
+
+        IsSyncing = true;
+        try
+        {
+            prop.Value = oldAnchor ?? string.Empty;
+        }
+        finally
+        {
+            IsSyncing = false;
+        }
+
+        Workspace.LastStatusMessage.Value = rejectionMessage;
+        return false;
     }
 
     private static bool HasDuplicateAnchorInPath(

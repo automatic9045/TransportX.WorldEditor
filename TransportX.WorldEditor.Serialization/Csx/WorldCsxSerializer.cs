@@ -433,6 +433,38 @@ public static class WorldCsxSerializer
         }
 
         HashSet<string> usedVars = new HashSet<string>(StringComparer.Ordinal) { "fSpline", "fJunction" };
+        foreach (SplinePlacementNode s in document.Splines)
+        {
+            foreach (SplineCurveSegment seg in s.Curves)
+            {
+                if (!string.IsNullOrEmpty(seg.OutputAnchorId))
+                {
+                    usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(seg.OutputAnchorId));
+                }
+            }
+
+            foreach (SplineGradientSegment seg in s.Gradients)
+            {
+                if (!string.IsNullOrEmpty(seg.OutputAnchorId))
+                {
+                    usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(seg.OutputAnchorId));
+                }
+            }
+
+            foreach (SplineCantSegment seg in s.Cants)
+            {
+                if (!string.IsNullOrEmpty(seg.OutputAnchorId))
+                {
+                    usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(seg.OutputAnchorId));
+                }
+            }
+
+            if (s.ConnectBezier is not null && !string.IsNullOrEmpty(s.ConnectBezier.OutputAnchorId))
+            {
+                usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(s.ConnectBezier.OutputAnchorId));
+            }
+        }
+
         HashSet<string> declaredAnchors = new HashSet<string>(StringComparer.Ordinal);
         Dictionary<string, string> splineBuiltVarById = new Dictionary<string, string>(StringComparer.Ordinal);
         Dictionary<string, string> junctionBuiltVarById = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -508,7 +540,8 @@ public static class WorldCsxSerializer
 
     private static string FormatOutAnchor(string anchorId, HashSet<string> declaredAnchors)
     {
-        return declaredAnchors.Add(anchorId) ? $"out var {anchorId}" : $"out {anchorId}";
+        string varName = DistanceExprCodec.FormatAnchorVariableName(anchorId);
+        return declaredAnchors.Add(varName) ? $"out var {varName}" : $"out {varName}";
     }
 
     private static void EmitSplineNode(
@@ -1430,7 +1463,7 @@ public static class WorldCsxSerializer
 
             if (args.Count == 2)
             {
-                if (RoslynCsxHelpers.IsOutArgument(args[1], out anchorId))
+                if (RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[1], out anchorId))
                 {
                 }
                 else if (!RoslynCsxHelpers.TryGetDouble(args[1].Expression, out handleScale))
@@ -1440,7 +1473,7 @@ public static class WorldCsxSerializer
             }
             else if (args.Count == 3)
             {
-                if (!RoslynCsxHelpers.IsOutArgument(args[1], out anchorId)
+                if (!RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[1], out anchorId)
                     || !RoslynCsxHelpers.TryGetDouble(args[2].Expression, out handleScale))
                 {
                     return false;
@@ -1544,7 +1577,7 @@ public static class WorldCsxSerializer
                 && RoslynCsxHelpers.TryGetDouble(args[0].Expression, out double len))
             {
                 string? anchor = null;
-                if (args.Count == 2 && !RoslynCsxHelpers.IsOutArgument(args[1], out anchor))
+                if (args.Count == 2 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[1], out anchor))
                 {
                     return false;
                 }
@@ -1558,7 +1591,7 @@ public static class WorldCsxSerializer
                 && RoslynCsxHelpers.TryGetDouble(args[1].Expression, out double arcLen))
             {
                 string? anchor = null;
-                if (args.Count == 3 && !RoslynCsxHelpers.IsOutArgument(args[2], out anchor))
+                if (args.Count == 3 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[2], out anchor))
                 {
                     return false;
                 }
@@ -1587,7 +1620,7 @@ public static class WorldCsxSerializer
                 && RoslynCsxHelpers.TryGetDouble(args[0].Expression, out double cLen))
             {
                 string? anchor = null;
-                if (args.Count == 2 && !RoslynCsxHelpers.IsOutArgument(args[1], out anchor))
+                if (args.Count == 2 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[1], out anchor))
                 {
                     return false;
                 }
@@ -1610,7 +1643,7 @@ public static class WorldCsxSerializer
                 && RoslynCsxHelpers.TryGetDouble(args[1].Expression, out double tLen))
             {
                 string? anchor = null;
-                if (args.Count == 3 && !RoslynCsxHelpers.IsOutArgument(args[2], out anchor))
+                if (args.Count == 3 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[2], out anchor))
                 {
                     return false;
                 }
@@ -1636,7 +1669,7 @@ public static class WorldCsxSerializer
                 && RoslynCsxHelpers.TryGetDouble(args[0].Expression, out double cLen))
             {
                 string? anchor = null;
-                if (args.Count == 2 && !RoslynCsxHelpers.IsOutArgument(args[1], out anchor))
+                if (args.Count == 2 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[1], out anchor))
                 {
                     return false;
                 }
@@ -1651,7 +1684,7 @@ public static class WorldCsxSerializer
                 && RoslynCsxHelpers.TryGetDouble(args[2].Expression, out double hLen))
             {
                 string? anchor = null;
-                if (args.Count == 4 && !RoslynCsxHelpers.IsOutArgument(args[3], out anchor))
+                if (args.Count == 4 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[3], out anchor))
                 {
                     return false;
                 }
@@ -1673,7 +1706,7 @@ public static class WorldCsxSerializer
                 && RoslynCsxHelpers.TryGetDouble(args[1].Expression, out double tLen))
             {
                 string? anchor = null;
-                if (args.Count == 3 && !RoslynCsxHelpers.IsOutArgument(args[2], out anchor))
+                if (args.Count == 3 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[2], out anchor))
                 {
                     return false;
                 }

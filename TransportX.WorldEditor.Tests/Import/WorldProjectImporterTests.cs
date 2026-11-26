@@ -113,12 +113,12 @@ public sealed class WorldProjectImporterTests
             Assert.Contains("// <editor-generated version=\"1\">", threeForked1Text);
             Assert.Contains("SignalController(\"4Forked1\")", threeForked1Text);
             Assert.Contains("PutSignalProp(", threeForked1Text);
-            Assert.Contains("tPath_SE_R_Out.Deflection(1).Yield((\"NS_S\", 7, 17), (\"NE_L\", 7, s1_2))", threeForked1Text);
-            Assert.Contains("out var s1_2", threeForked1Text);
+            Assert.Contains("tPath_SE_R_Out.Deflection(1).Yield((\"NS_S\", 7, 17), (\"NE_L\", 7, s_s1_2))", threeForked1Text);
+            Assert.Contains("out var s_s1_2", threeForked1Text);
             Assert.DoesNotContain("for (double x", threeForked1Text);
 
             string deadEndText = File.ReadAllText(Path.Combine(destWorldDir, "Templates", "Junctions", "DeadEnd1.csx"));
-            Assert.Contains("tPath_Anon.Width.Constant(s2 - s1);", deadEndText);
+            Assert.Contains("tPath_Anon.Width.Constant(s_s2 - s_s1);", deadEndText);
 
             string worldCsxText = File.ReadAllText(Path.Combine(destWorldDir, "World.csx"));
             Assert.Contains("// <editor-generated version=\"1\">", worldCsxText);

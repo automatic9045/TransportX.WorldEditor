@@ -3898,13 +3898,25 @@ public sealed class InspectorToolViewModel : Tool, IDisposable
         string? anchorId = string.IsNullOrWhiteSpace(ConnectOutputAnchorId.Value)
             ? null
             : ConnectOutputAnchorId.Value.Trim();
-        if (!string.IsNullOrEmpty(anchorId)
-            && Workspace.FindSpline(splineId) is SplinePlacementNode currentSpline
-            && SplineDefinesAnchorInSegments(currentSpline, anchorId))
+        if (!string.IsNullOrEmpty(anchorId))
         {
-            ConnectOutputAnchorId.Value = currentSpline.ConnectBezier?.OutputAnchorId ?? string.Empty;
-            Workspace.LastStatusMessage.Value = $"同一スプライン内でアンカー '{anchorId}' が重複しています。別の名前を指定してください。";
-            return;
+            SplinePlacementNode? currentSpline = Workspace.FindSpline(splineId);
+            string? rejectionMessage = null;
+            if (!CSharpIdentifierUtilities.TryValidateAnchorId(anchorId, out string formatError))
+            {
+                rejectionMessage = formatError;
+            }
+            else if (currentSpline is not null && SplineDefinesAnchorInSegments(currentSpline, anchorId))
+            {
+                rejectionMessage = $"同一スプライン内でアンカー '{anchorId}' が重複しています。別の名前を指定してください。";
+            }
+
+            if (rejectionMessage is not null)
+            {
+                ConnectOutputAnchorId.Value = currentSpline?.ConnectBezier?.OutputAnchorId ?? string.Empty;
+                Workspace.LastStatusMessage.Value = rejectionMessage;
+                return;
+            }
         }
 
         Workspace.SetSplineConnectBezier(

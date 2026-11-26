@@ -204,6 +204,10 @@ public sealed class CanonicalCsxSerializersTests
         Assert.DoesNotContain(".PutExtrusion(null,", csx, System.StringComparison.Ordinal);
         Assert.Contains("tPath_ES_L.PutExtrusion(\"WhiteLine150\",", csx, System.StringComparison.Ordinal);
         Assert.Contains("tCurve_SN.PutExtrusion(\"WhiteLine150\",", csx, System.StringComparison.Ordinal);
+        Assert.Contains("out var s_s_mid", csx, System.StringComparison.Ordinal);
+        Assert.Contains("out var s_w_1", csx, System.StringComparison.Ordinal);
+        Assert.Contains("s_s_mid - 2", csx, System.StringComparison.Ordinal);
+        Assert.Contains("s_s_end - 4", csx, System.StringComparison.Ordinal);
 
         (JunctionTemplateDocument? parsed, IReadOnlyList<ParseDiagnostic> diag) = JunctionTemplateCsxSerializer.Parse("3Forked1.csx", csx, doc.RelativePath);
 
@@ -360,6 +364,10 @@ public sealed class CanonicalCsxSerializersTests
         Assert.Contains("    // <display name=\"一郷バス停\" />", generated, System.StringComparison.Ordinal);
         Assert.Contains("    // <display name=\"駅前通り &quot;本線&quot; &amp; &lt;入口&gt;\" />", generated, System.StringComparison.Ordinal);
         Assert.Contains("    // <display name=\"北口交差点\" />", generated, System.StringComparison.Ordinal);
+        Assert.Contains("out var s_s_mid", generated, System.StringComparison.Ordinal);
+        Assert.Contains("out var s_s_end", generated, System.StringComparison.Ordinal);
+        Assert.Contains("out var s_s_loop", generated, System.StringComparison.Ordinal);
+        Assert.Contains("s_s_mid - 5", generated, System.StringComparison.Ordinal);
 
         int idxS1 = generated.IndexOf("    var fSpline =", System.StringComparison.Ordinal);
         int idxJ1 = generated.IndexOf("    var fJunction =", System.StringComparison.Ordinal);
@@ -431,5 +439,21 @@ public sealed class CanonicalCsxSerializersTests
         (ParsedWorldCsx? res2, IReadOnlyList<ParseDiagnostic> diag2) = WorldCsxSerializer.Parse("World.csx", orphanPreBuild);
         Assert.Null(res2);
         Assert.Contains(diag2, d => d.Severity == DiagnosticSeverity.Error && d.Line == 5);
+
+        string unprefixedAnchorCsx = string.Join('\n',
+        [
+            "#load \"__Editor.csx\"",
+            "{",
+            "    // <editor-generated version=\"1\">",
+            "    var fSpline = Chunks[0, 0].BeginSpline(\"Spline1\", 0, 0, 0);",
+            "    fSpline.Curves.Straight(10, out var foo);",
+            "    var s1 = fSpline.Build();",
+            "    // </editor-generated>",
+            "}",
+        ]);
+
+        (ParsedWorldCsx? res3, IReadOnlyList<ParseDiagnostic> diag3) = WorldCsxSerializer.Parse("World.csx", unprefixedAnchorCsx);
+        Assert.Null(res3);
+        Assert.Contains(diag3, d => d.Severity == DiagnosticSeverity.Error);
     }
 }

@@ -35,6 +35,38 @@ public static class CSharpIdentifierUtilities
         return TryValidateIdentifier(candidate, out _);
     }
 
+    public static bool IsValidAnchorId(string? candidate)
+    {
+        return TryValidateAnchorId(candidate, out _);
+    }
+
+    public static bool TryValidateAnchorId(string? candidate, out string errorReason)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            errorReason = "Anchor ID は空にできません。";
+            return false;
+        }
+
+        if (!string.Equals(candidate, candidate.Trim(), StringComparison.Ordinal))
+        {
+            errorReason = "Anchor ID の前後に空白を含めることはできません。";
+            return false;
+        }
+
+        foreach (Rune rune in candidate.EnumerateRunes())
+        {
+            if (!IsIdentifierPartRune(rune))
+            {
+                errorReason = $"Anchor ID '{candidate}' の文字 '{rune}' は使用できません（空白や記号は不可）。";
+                return false;
+            }
+        }
+
+        errorReason = string.Empty;
+        return true;
+    }
+
     public static bool TryValidateIdentifier(string? candidate, out string errorReason)
     {
         if (string.IsNullOrWhiteSpace(candidate))

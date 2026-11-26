@@ -284,7 +284,8 @@ public static class JunctionTemplateCsxSerializer
 
     private static string FormatOutAnchor(string anchorId, HashSet<string> declaredAnchors)
     {
-        return declaredAnchors.Add(anchorId) ? $"out var {anchorId}" : $"out {anchorId}";
+        string varName = DistanceExprCodec.FormatAnchorVariableName(anchorId);
+        return declaredAnchors.Add(varName) ? $"out var {varName}" : $"out {varName}";
     }
 
     private static void AppendSegments(
@@ -689,7 +690,7 @@ public static class JunctionTemplateCsxSerializer
             }
 
             string? anchor = null;
-            if (args.Count == 2 && !RoslynCsxHelpers.IsOutArgument(args[1], out anchor))
+            if (args.Count == 2 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[1], out anchor))
             {
                 return false;
             }
@@ -709,7 +710,7 @@ public static class JunctionTemplateCsxSerializer
             }
 
             string? anchor = null;
-            if (args.Count == 4 && !RoslynCsxHelpers.IsOutArgument(args[3], out anchor))
+            if (args.Count == 4 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[3], out anchor))
             {
                 return false;
             }

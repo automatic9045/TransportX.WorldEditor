@@ -2059,14 +2059,14 @@ internal sealed class CsxScriptImportEngine
 
         foreach (KeyValuePair<string, string> anchorKv in WorldAnchorAliases)
         {
-            map[anchorKv.Key] = anchorKv.Value;
+            map[anchorKv.Key] = DistanceExprCodec.FormatAnchorVariableName(anchorKv.Value);
         }
 
         if (activeJunction is not null)
         {
             foreach (KeyValuePair<string, string> jAnchorKv in activeJunction.AnchorAliases)
             {
-                map[jAnchorKv.Key] = jAnchorKv.Value;
+                map[jAnchorKv.Key] = DistanceExprCodec.FormatAnchorVariableName(jAnchorKv.Value);
             }
         }
 

@@ -259,6 +259,14 @@ public sealed class WorldValidatorTests
         Assert.False(CSharpIdentifierUtilities.IsValidIdentifier("road-1"));
         Assert.False(CSharpIdentifierUtilities.IsValidIdentifier("class"));
 
+        Assert.True(CSharpIdentifierUtilities.IsValidAnchorId("fSpline"));
+        Assert.True(CSharpIdentifierUtilities.IsValidAnchorId("class"));
+        Assert.True(CSharpIdentifierUtilities.IsValidAnchorId("1"));
+        Assert.True(CSharpIdentifierUtilities.IsValidAnchorId("中間_1"));
+        Assert.False(CSharpIdentifierUtilities.IsValidAnchorId(""));
+        Assert.False(CSharpIdentifierUtilities.IsValidAnchorId("a b"));
+        Assert.False(CSharpIdentifierUtilities.IsValidAnchorId("a-b"));
+
         WorldProject project = new WorldProject();
         project.Placement.Splines.Add(new SplinePlacementNode { Id = "s1", Key = null });
         project.Placement.Splines.Add(new SplinePlacementNode { Id = "s2", Key = "invalid space" });

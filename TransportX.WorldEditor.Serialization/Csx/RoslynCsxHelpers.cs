@@ -447,6 +447,28 @@ internal static class RoslynCsxHelpers
         return false;
     }
 
+    public static bool IsCanonicalOutAnchorArgument(ArgumentSyntax argument, out string? anchorId)
+    {
+        anchorId = null;
+        if (!IsOutArgument(argument, out string? rawIdentifier))
+        {
+            return false;
+        }
+
+        if (rawIdentifier is null)
+        {
+            return true;
+        }
+
+        if (DistanceExprCodec.TryParseAnchorVariableName(rawIdentifier, out string parsedAnchor))
+        {
+            anchorId = parsedAnchor;
+            return true;
+        }
+
+        return false;
+    }
+
     public static string FormatStringLiteral(string value)
     {
         return SymbolDisplay.FormatLiteral(value, quote: true);

@@ -175,6 +175,16 @@ public static class DistanceAnchorResolver
             return;
         }
 
+        if (!CSharpIdentifierUtilities.TryValidateAnchorId(anchorId, out string anchorError))
+        {
+            issues.Add(new ValidationIssue(
+                ValidationSeverity.Error,
+                "ANCHOR_INVALID",
+                $"スコープ '{scopeLabel}' のアンカー識別子 '{anchorId}' が不正です: {anchorError}",
+                sourcePath));
+            return;
+        }
+
         if (!anchors.TryAdd(anchorId, value))
         {
             issues.Add(new ValidationIssue(

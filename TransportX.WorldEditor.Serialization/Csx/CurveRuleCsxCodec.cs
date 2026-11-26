@@ -291,7 +291,7 @@ internal static class CurveRuleCsxCodec
             }
 
             string? anchorId = null;
-            if (args.Count == 7 && !RoslynCsxHelpers.IsOutArgument(args[6], out anchorId))
+            if (args.Count == 7 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[6], out anchorId))
             {
                 return false;
             }
@@ -317,7 +317,7 @@ internal static class CurveRuleCsxCodec
 
             if (args.Count == 7)
             {
-                if (RoslynCsxHelpers.IsOutArgument(args[6], out anchorId))
+                if (RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[6], out anchorId))
                 {
                 }
                 else if (!RoslynCsxHelpers.TryGetDouble(args[6].Expression, out handleScale))
@@ -327,7 +327,7 @@ internal static class CurveRuleCsxCodec
             }
             else if (args.Count == 8)
             {
-                if (!RoslynCsxHelpers.IsOutArgument(args[6], out anchorId)
+                if (!RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[6], out anchorId)
                     || !RoslynCsxHelpers.TryGetDouble(args[7].Expression, out handleScale))
                 {
                     return false;
@@ -341,7 +341,7 @@ internal static class CurveRuleCsxCodec
         if (allowToEnd && method == "StraightToEnd")
         {
             string? anchorId = null;
-            if (args.Count == 1 && !RoslynCsxHelpers.IsOutArgument(args[0], out anchorId))
+            if (args.Count == 1 && !RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[0], out anchorId))
             {
                 return false;
             }
@@ -367,7 +367,7 @@ internal static class CurveRuleCsxCodec
 
             if (args.Count == 1)
             {
-                if (RoslynCsxHelpers.IsOutArgument(args[0], out anchorId))
+                if (RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[0], out anchorId))
                 {
                 }
                 else if (!RoslynCsxHelpers.TryGetDouble(args[0].Expression, out handleScale))
@@ -377,7 +377,7 @@ internal static class CurveRuleCsxCodec
             }
             else if (args.Count == 2)
             {
-                if (!RoslynCsxHelpers.IsOutArgument(args[0], out anchorId)
+                if (!RoslynCsxHelpers.IsCanonicalOutAnchorArgument(args[0], out anchorId)
                     || !RoslynCsxHelpers.TryGetDouble(args[1].Expression, out handleScale))
                 {
                     return false;

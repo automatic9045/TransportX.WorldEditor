@@ -943,21 +943,8 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
 
         SplineCurveSegment oldSeg = current.Curves[idx];
         UpdateCurveParameterState(CurveKind.Value);
-        string? newAnchor = string.IsNullOrWhiteSpace(CurveAnchorId.Value) ? null : CurveAnchorId.Value.Trim();
-        if (!string.IsNullOrEmpty(newAnchor)
-            && HasDuplicateAnchorInSpline(current, newAnchor, SplineTimelineTrackKind.Curves, idx))
+        if (!TryValidateSplineAnchorEdit(current, CurveAnchorId, oldSeg.OutputAnchorId, SplineTimelineTrackKind.Curves, idx, out string? newAnchor))
         {
-            IsSyncing = true;
-            try
-            {
-                CurveAnchorId.Value = oldSeg.OutputAnchorId ?? string.Empty;
-            }
-            finally
-            {
-                IsSyncing = false;
-            }
-
-            Workspace.LastStatusMessage.Value = $"同一スプライン内でアンカー '{newAnchor}' が重複しています。別の名前を指定してください。";
             return;
         }
 
@@ -1002,21 +989,8 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
 
         SplineGradientSegment oldSeg = current.Gradients[idx];
         UpdateGradientParameterState(GradientKind.Value);
-        string? newAnchor = string.IsNullOrWhiteSpace(GradientAnchorId.Value) ? null : GradientAnchorId.Value.Trim();
-        if (!string.IsNullOrEmpty(newAnchor)
-            && HasDuplicateAnchorInSpline(current, newAnchor, SplineTimelineTrackKind.Gradients, idx))
+        if (!TryValidateSplineAnchorEdit(current, GradientAnchorId, oldSeg.OutputAnchorId, SplineTimelineTrackKind.Gradients, idx, out string? newAnchor))
         {
-            IsSyncing = true;
-            try
-            {
-                GradientAnchorId.Value = oldSeg.OutputAnchorId ?? string.Empty;
-            }
-            finally
-            {
-                IsSyncing = false;
-            }
-
-            Workspace.LastStatusMessage.Value = $"同一スプライン内でアンカー '{newAnchor}' が重複しています。別の名前を指定してください。";
             return;
         }
 
@@ -1061,21 +1035,8 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
 
         SplineCantSegment oldSeg = current.Cants[idx];
         UpdateCantParameterState(CantKind.Value);
-        string? newAnchor = string.IsNullOrWhiteSpace(CantAnchorId.Value) ? null : CantAnchorId.Value.Trim();
-        if (!string.IsNullOrEmpty(newAnchor)
-            && HasDuplicateAnchorInSpline(current, newAnchor, SplineTimelineTrackKind.Cants, idx))
+        if (!TryValidateSplineAnchorEdit(current, CantAnchorId, oldSeg.OutputAnchorId, SplineTimelineTrackKind.Cants, idx, out string? newAnchor))
         {
-            IsSyncing = true;
-            try
-            {
-                CantAnchorId.Value = oldSeg.OutputAnchorId ?? string.Empty;
-            }
-            finally
-            {
-                IsSyncing = false;
-            }
-
-            Workspace.LastStatusMessage.Value = $"同一スプライン内でアンカー '{newAnchor}' が重複しています。別の名前を指定してください。";
             return;
         }
 
@@ -1103,6 +1064,49 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
         {
             IsCommitting = false;
         }
+    }
+
+    private bool TryValidateSplineAnchorEdit(
+        SplinePlacementNode current,
+        BindableReactiveProperty<string> prop,
+        string? oldAnchor,
+        SplineTimelineTrackKind trackKind,
+        int idx,
+        out string? newAnchor)
+    {
+        newAnchor = string.IsNullOrWhiteSpace(prop.Value) ? null : prop.Value.Trim();
+        if (string.IsNullOrEmpty(newAnchor))
+        {
+            return true;
+        }
+
+        string? rejectionMessage = null;
+        if (!CSharpIdentifierUtilities.TryValidateAnchorId(newAnchor, out string formatError))
+        {
+            rejectionMessage = formatError;
+        }
+        else if (HasDuplicateAnchorInSpline(current, newAnchor, trackKind, idx))
+        {
+            rejectionMessage = $"同一スプライン内でアンカー '{newAnchor}' が重複しています。別の名前を指定してください。";
+        }
+
+        if (rejectionMessage is null)
+        {
+            return true;
+        }
+
+        IsSyncing = true;
+        try
+        {
+            prop.Value = oldAnchor ?? string.Empty;
+        }
+        finally
+        {
+            IsSyncing = false;
+        }
+
+        Workspace!.LastStatusMessage.Value = rejectionMessage;
+        return false;
     }
 
     private void UpdateCurveParameterState(SplineCurveSegmentKind kind)

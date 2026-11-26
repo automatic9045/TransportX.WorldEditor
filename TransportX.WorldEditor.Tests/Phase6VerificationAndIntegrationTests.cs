@@ -684,7 +684,7 @@ public sealed class Phase6VerificationAndIntegrationTests
             Assert.Null(s1.Curves[1].OutputAnchorId);
             Assert.Equal(string.Empty, shell.TimelineTool.CurveAnchorId.Value);
 
-            // 3. Reusing "s" intentionally on a subsequent spline emits `out var s` once, then `out s`
+            // 3. Reusing "s" intentionally on a subsequent spline emits `out var s_s` once, then `out s_s`
             ws.SelectSpline(s2.Id);
             shell.TimelineTool.SelectTrackItem(SplineTimelineTrackKind.Curves, 0);
             shell.TimelineTool.CurveAnchorId.Value = "s";
@@ -693,9 +693,9 @@ public sealed class Phase6VerificationAndIntegrationTests
             ws.Save(dirtyOnly: false);
             string worldCsxPath = Path.Combine(project.WorldDirectory, project.Placement.RelativePath);
             string worldCsxText = File.ReadAllText(worldCsxPath);
-            Assert.Contains("out var s)", worldCsxText);
-            Assert.Contains(", out s)", worldCsxText);
-            Assert.DoesNotContain(", out s_end)", worldCsxText);
+            Assert.Contains("out var s_s)", worldCsxText);
+            Assert.Contains(", out s_s)", worldCsxText);
+            Assert.DoesNotContain(", out s_s_end)", worldCsxText);
 
             (ParsedWorldCsx? parsedWorld, IReadOnlyList<Serialization.Diagnostics.ParseDiagnostic> worldDiags) =
                 WorldCsxSerializer.Parse(worldCsxPath, worldCsxText, project.Placement.RelativePath);
@@ -716,21 +716,139 @@ public sealed class Phase6VerificationAndIntegrationTests
                          || e.Level == TransportX.Diagnostics.ErrorLevel.Fatal);
             }
 
-            // 4. JunctionTemplateCsxSerializer also emits `out var s1` then `out s1` across paths/curves
+            // 4. JunctionTemplateCsxSerializer also emits `out var s_s1` then `out s_s1` across paths/curves
             JunctionTemplateDocument jDoc = project.JunctionTemplates[juncKey!];
             jDoc.Paths.Add(new JunctionPathTemplateModel { Key = "P1", FromPortKey = "S", ToPortKey = "N" });
             jDoc.Paths[^1].Segments.Add(new JunctionCurveSegment(JunctionCurveSegmentKind.StraightToEnd, PoseDegreesModel.Identity, 0.5, "s1"));
             jDoc.Curves[0].Segments[0] = new JunctionCurveSegment(JunctionCurveSegmentKind.StraightTo, PoseDegreesModel.FromTranslation(0, 0, 20), 0.5, "s1");
 
             string jCsxText = JunctionTemplateCsxSerializer.Generate(jDoc);
-            Assert.Contains("out var s1)", jCsxText);
-            Assert.Contains(", out s1)", jCsxText);
+            Assert.Contains("out var s_s1)", jCsxText);
+            Assert.Contains(", out s_s1)", jCsxText);
             (JunctionTemplateDocument? parsedJunc, IReadOnlyList<Serialization.Diagnostics.ParseDiagnostic> jDiags) =
                 JunctionTemplateCsxSerializer.Parse("TestJunc.csx", jCsxText, jDoc.RelativePath);
             Assert.NotNull(parsedJunc);
             Assert.DoesNotContain(jDiags, d => d.Severity == Serialization.Diagnostics.DiagnosticSeverity.Error);
             Assert.Equal("s1", parsedJunc!.Paths[^1].Segments[0].OutputAnchorId);
             Assert.Equal("s1", parsedJunc.Curves[0].Segments[0].OutputAnchorId);
+        }
+        finally
+        {
+            DeleteTempDirectory(tempDir);
+        }
+    }
+
+    [Fact]
+    public void Anchors_AllowKeywordsAndReservedNamesViaPrefixedVariables_WithoutCollision()
+    {
+        string tempDir = CreateTempDirectory();
+        try
+        {
+            using MainWindowViewModel shell = new();
+            WorldWorkspaceService ws = shell.Workspace;
+            ws.EnableBackgroundScriptCompilation = false;
+            WorldProject project = shell.CreateAndActivateWorld(tempDir, "Author", "PrefixedAnchors", "Prefixed Anchors", "");
+            project.Manifest.Dependencies.Clear();
+
+            SplinePlacementNode s1 = Assert.Single(project.Placement.Splines);
+            Assert.True(ws.RenameSplineKey(s1.Id, "s_fSpline"));
+
+            ws.SelectSpline(s1.Id);
+            shell.TimelineTool.AddCurveCommand.Execute(Unit.Default);
+            shell.TimelineTool.AddCurveCommand.Execute(Unit.Default);
+            shell.TimelineTool.SelectTrackItem(SplineTimelineTrackKind.Curves, 0);
+            shell.TimelineTool.CurveAnchorId.Value = "fSpline";
+            shell.TimelineTool.SelectTrackItem(SplineTimelineTrackKind.Curves, 1);
+            shell.TimelineTool.CurveAnchorId.Value = "class";
+            shell.TimelineTool.SelectTrackItem(SplineTimelineTrackKind.Curves, 2);
+            shell.TimelineTool.CurveAnchorId.Value = "1";
+
+            // Invalid characters (space) are rejected and reverted in TimelineToolViewModel
+            shell.TimelineTool.CurveAnchorId.Value = "a b";
+            Assert.Equal("1", shell.TimelineTool.CurveAnchorId.Value);
+            Assert.Equal("1", s1.Curves[2].OutputAnchorId);
+
+            // Use "fSpline" anchor in an extrusion rule
+            shell.TimelineTool.AddExtrusionCommand.Execute(Unit.Default);
+            shell.TimelineTool.SelectTrackItem(SplineTimelineTrackKind.Extrusions, 0);
+            shell.TimelineTool.FromModeIndex.Value = 1;
+            shell.TimelineTool.FromAnchorId.Value = "fSpline";
+            shell.TimelineTool.FromOffset.Value = -5m;
+
+            // JunctionTemplate Anchor IDs also permit reserved names and reject invalid spaces
+            string layoutKey = project.LaneLayouts.Keys.First();
+            Assert.True(ws.CreateNewJunctionTemplate("AnchorJunc", out string? jKey, out _));
+            JunctionTemplateDocument jDoc = project.JunctionTemplates[jKey!];
+            jDoc.Ports.Clear();
+            jDoc.Paths.Clear();
+            jDoc.Ports.Add(new JunctionPortDefinition("S", layoutKey, PoseDegreesModel.Identity));
+            jDoc.Ports.Add(new JunctionPortDefinition("N", layoutKey, new PoseDegreesModel(0, 0, 20, 0, 0, 0)));
+            jDoc.Paths.Add(new JunctionPathTemplateModel { Key = "P1", FromPortKey = "S", ToPortKey = "N" });
+            jDoc.Paths[0].Segments.Add(new JunctionCurveSegment(JunctionCurveSegmentKind.StraightToEnd, PoseDegreesModel.Identity));
+            jDoc.Paths[0].WidthSegments.Add(new JunctionWidthSegment(JunctionWidthSegmentKind.Constant, 0, 0, AnchoredDistance.Absolute(5.0)));
+
+            // Place a junction at Chunk(1, 0) so s1 has a compatible ConnectBezier target, then verify invalid Anchor ID rejection
+            JunctionPlacementNode? jNode = ws.AddJunctionAtChunkPose(jKey!, new WorldPoseDegreesModel(new ChunkIndexModel(1, 0), PoseDegreesModel.FromTranslation(100, 0, 100)));
+            Assert.NotNull(jNode);
+            ws.SelectSpline(null);
+            ws.SelectSpline(s1.Id);
+            Assert.NotEmpty(shell.InspectorTool.CompatibleConnectTargets);
+            shell.InspectorTool.SelectedConnectTarget.Value = shell.InspectorTool.CompatibleConnectTargets[0];
+            shell.InspectorTool.ConnectOutputAnchorId.Value = "c s";
+            shell.InspectorTool.ApplyConnectBezierCommand.Execute(Unit.Default);
+            Assert.Equal(string.Empty, shell.InspectorTool.ConnectOutputAnchorId.Value);
+            Assert.Null(s1.ConnectBezier);
+
+            AssetBrowserEntry jEntry = shell.AssetBrowserTool.JunctionTemplateItems.Single(e => e.Key == jKey);
+            using JunctionTemplateEditorDocumentViewModel? jVm = shell.OpenAsset(jEntry) as JunctionTemplateEditorDocumentViewModel;
+            Assert.NotNull(jVm);
+            jVm!.SelectedPath.Value = jVm.Paths[0];
+            jVm.SelectedPathSegment.Value = jVm.PathSegments[0];
+            jVm.SelectedPathWidth.Value = jVm.PathWidths[0];
+            jVm.PathSegAnchorId.Value = "tJunction";
+            Assert.Equal("tJunction", jDoc.Paths[0].Segments[0].OutputAnchorId);
+            jVm.WidthAnchorId.Value = "class";
+            Assert.Equal("class", jDoc.Paths[0].WidthSegments[0].OutputAnchorId);
+            jVm.WidthAnchorId.Value = "bad id";
+            Assert.Equal("class", jVm.WidthAnchorId.Value);
+
+            ws.Save(dirtyOnly: false);
+            string worldCsxPath = Path.Combine(project.WorldDirectory, project.Placement.RelativePath);
+            string worldCsxText = File.ReadAllText(worldCsxPath);
+            Assert.Contains("out var s_fSpline", worldCsxText);
+            Assert.Contains("out var s_class", worldCsxText);
+            Assert.Contains("out var s_1", worldCsxText);
+            Assert.Contains("s_fSpline - 5", worldCsxText);
+            Assert.Contains("fSpline.Key = \"s_fSpline\";", worldCsxText);
+            Assert.Contains("var s_fSpline_2 = fSpline.Build();", worldCsxText);
+
+            string jCsxText = File.ReadAllText(Path.Combine(project.WorldDirectory, jDoc.RelativePath));
+            Assert.Contains("out var s_tJunction", jCsxText);
+            Assert.Contains("out var s_class", jCsxText);
+
+            (ParsedWorldCsx? parsedWorld, IReadOnlyList<Serialization.Diagnostics.ParseDiagnostic> worldDiags) =
+                WorldCsxSerializer.Parse(worldCsxPath, worldCsxText, project.Placement.RelativePath);
+            Assert.NotNull(parsedWorld);
+            Assert.Empty(worldDiags);
+            SplinePlacementNode reparsedSpline = Assert.Single(parsedWorld!.Document.Splines);
+            Assert.Equal("s_fSpline", reparsedSpline.Key);
+            Assert.Equal("fSpline", reparsedSpline.Curves[0].OutputAnchorId);
+            Assert.Equal("class", reparsedSpline.Curves[1].OutputAnchorId);
+            Assert.Equal("1", reparsedSpline.Curves[2].OutputAnchorId);
+            Assert.Equal("fSpline", reparsedSpline.Extrusions[0].From.AnchorId);
+            Assert.Equal(-5.0, reparsedSpline.Extrusions[0].From.Offset, 6);
+
+            if (OperatingSystem.IsWindows())
+            {
+                (bool started, IReadOnlyList<TransportX.Diagnostics.Error> errors, bool hasFatal, _) =
+                    RunHeadlessScriptVerification(project, tickCount: 2);
+                Assert.True(started);
+                Assert.False(hasFatal);
+                Assert.DoesNotContain(
+                    errors,
+                    e => e.Level == TransportX.Diagnostics.ErrorLevel.Error
+                         || e.Level == TransportX.Diagnostics.ErrorLevel.Fatal);
+            }
         }
         finally
         {

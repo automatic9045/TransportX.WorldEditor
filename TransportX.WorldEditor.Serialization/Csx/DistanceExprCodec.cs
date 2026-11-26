@@ -13,6 +13,28 @@ namespace TransportX.WorldEditor.Serialization.Csx;
 /// </summary>
 public static class DistanceExprCodec
 {
+    public const string AnchorVariablePrefix = "s_";
+
+    public static string FormatAnchorVariableName(string anchorId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(anchorId);
+        return $"{AnchorVariablePrefix}{anchorId}";
+    }
+
+    public static bool TryParseAnchorVariableName(string varName, out string anchorId)
+    {
+        if (!string.IsNullOrEmpty(varName)
+            && varName.StartsWith(AnchorVariablePrefix, StringComparison.Ordinal)
+            && AnchorVariablePrefix.Length < varName.Length)
+        {
+            anchorId = varName[AnchorVariablePrefix.Length..];
+            return true;
+        }
+
+        anchorId = string.Empty;
+        return false;
+    }
+
     public static string FormatNumber(double value)
     {
         double normalized = value == 0.0 ? 0.0 : value;
@@ -26,17 +48,18 @@ public static class DistanceExprCodec
             return FormatNumber(distance.Offset);
         }
 
+        string varName = FormatAnchorVariableName(distance.AnchorId);
         if (distance.Offset == 0.0)
         {
-            return distance.AnchorId;
+            return varName;
         }
 
         if (0.0 < distance.Offset)
         {
-            return $"{distance.AnchorId} + {FormatNumber(distance.Offset)}";
+            return $"{varName} + {FormatNumber(distance.Offset)}";
         }
 
-        return $"{distance.AnchorId} - {FormatNumber(-distance.Offset)}";
+        return $"{varName} - {FormatNumber(-distance.Offset)}";
     }
 
     public static string FormatNullableUpperBound(AnchoredDistance? distance)
@@ -67,25 +90,27 @@ public static class DistanceExprCodec
             return true;
         }
 
-        if (expression is IdentifierNameSyntax ident)
+        if (expression is IdentifierNameSyntax ident
+            && TryParseAnchorVariableName(ident.Identifier.ValueText, out string anchorId))
         {
-            result = AnchoredDistance.RelativeTo(ident.Identifier.ValueText, 0.0);
+            result = AnchoredDistance.RelativeTo(anchorId, 0.0);
             return true;
         }
 
         if (expression is BinaryExpressionSyntax binary
             && binary.Left is IdentifierNameSyntax leftIdent
+            && TryParseAnchorVariableName(leftIdent.Identifier.ValueText, out string leftAnchorId)
             && RoslynCsxHelpers.TryGetDouble(binary.Right, out double delta))
         {
             if (binary.IsKind(SyntaxKind.AddExpression))
             {
-                result = AnchoredDistance.RelativeTo(leftIdent.Identifier.ValueText, delta);
+                result = AnchoredDistance.RelativeTo(leftAnchorId, delta);
                 return true;
             }
 
             if (binary.IsKind(SyntaxKind.SubtractExpression))
             {
-                result = AnchoredDistance.RelativeTo(leftIdent.Identifier.ValueText, -delta);
+                result = AnchoredDistance.RelativeTo(leftAnchorId, -delta);
                 return true;
             }
         }
