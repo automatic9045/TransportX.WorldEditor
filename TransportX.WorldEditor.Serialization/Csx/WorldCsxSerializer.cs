@@ -67,8 +67,9 @@ public static class WorldCsxSerializer
 
         Dictionary<string, PendingFactoryNode> activeFactories = new Dictionary<string, PendingFactoryNode>(StringComparer.Ordinal);
         HashSet<string> declaredFactoryVars = new HashSet<string>(StringComparer.Ordinal);
-        Dictionary<string, string> splineBuiltVars = new Dictionary<string, string>(StringComparer.Ordinal);
-        Dictionary<string, string> junctionBuiltVars = new Dictionary<string, string>(StringComparer.Ordinal);
+        HashSet<string> builtSplineKeys = new HashSet<string>(StringComparer.Ordinal);
+        HashSet<string> builtJunctionKeys = new HashSet<string>(StringComparer.Ordinal);
+        HashSet<string> usedNodeKeys = new HashSet<string>(StringComparer.Ordinal);
         HashSet<string> usedVarNames = new HashSet<string>(StringComparer.Ordinal);
         HashSet<int> boundPreBuildIndices = new HashSet<int>();
         int propCounter = 0;
@@ -86,10 +87,11 @@ public static class WorldCsxSerializer
 
             if (statement is LocalDeclarationStatementSyntax localDecl)
             {
+                ReportOrphanPreBuilds(attachedPreBuilds, preBuildByIndex, filePath, diagnostics);
+
                 if (localDecl.Declaration.Variables.Count != 1
                     || localDecl.Declaration.Variables[0].Initializer?.Value is not ExpressionSyntax initExpr)
                 {
-                    ReportOrphanPreBuilds(attachedPreBuilds, preBuildByIndex, filePath, diagnostics);
                     diagnostics.Add(new ParseDiagnostic(
                         DiagnosticSeverity.Error,
                         filePath,
@@ -102,7 +104,6 @@ public static class WorldCsxSerializer
                 string varName = localDecl.Declaration.Variables[0].Identifier.ValueText;
                 if (!usedVarNames.Add(varName))
                 {
-                    ReportOrphanPreBuilds(attachedPreBuilds, preBuildByIndex, filePath, diagnostics);
                     diagnostics.Add(new ParseDiagnostic(
                         DiagnosticSeverity.Error,
                         filePath,
@@ -112,53 +113,8 @@ public static class WorldCsxSerializer
                     continue;
                 }
 
-                if (initExpr is InvocationExpressionSyntax buildInv
-                    && TryParseBuildStatement(buildInv, activeFactories, out PendingFactoryNode? pendingFactory))
-                {
-                    string? preBuildCode = ResolvePreBuildForBuildStatement(
-                        attachedPreBuilds,
-                        preBuildByIndex,
-                        boundPreBuildIndices,
-                        filePath,
-                        diagnostics);
-
-                    SetFactoryDisplayName(pendingFactory!, statementDisplayName, onlyIfUnset: true);
-
-                    if (pendingFactory is PendingSplineFactory ps)
-                    {
-                        ps.Node.Id = varName;
-                        if (string.IsNullOrWhiteSpace(ps.Node.Key))
-                        {
-                            ps.Node.Key = varName;
-                        }
-
-                        ps.Node.PreBuildUserCode = preBuildCode;
-                        splineBuiltVars[varName] = ps.Node.Id;
-                        doc.Splines.Add(ps.Node);
-                        activeFactories.Remove(ps.FactoryVarName);
-                        continue;
-                    }
-
-                    if (pendingFactory is PendingJunctionFactory pj)
-                    {
-                        pj.Node.Id = varName;
-                        if (string.IsNullOrWhiteSpace(pj.Node.Key))
-                        {
-                            pj.Node.Key = varName;
-                        }
-
-                        pj.Node.PreBuildUserCode = preBuildCode;
-                        junctionBuiltVars[varName] = pj.Node.Id;
-                        doc.Junctions.Add(pj.Node);
-                        activeFactories.Remove(pj.FactoryVarName);
-                        continue;
-                    }
-                }
-
-                ReportOrphanPreBuilds(attachedPreBuilds, preBuildByIndex, filePath, diagnostics);
-
                 if (initExpr is InvocationExpressionSyntax createInv
-                    && TryParseFactoryStart(createInv, varName, splineBuiltVars, junctionBuiltVars, out PendingFactoryNode? startedFactory))
+                    && TryParseFactoryStart(createInv, varName, builtSplineKeys, builtJunctionKeys, out PendingFactoryNode? startedFactory))
                 {
                     SetFactoryDisplayName(startedFactory!, statementDisplayName);
                     declaredFactoryVars.Add(varName);
@@ -175,10 +131,72 @@ public static class WorldCsxSerializer
                 continue;
             }
 
-            ReportOrphanPreBuilds(attachedPreBuilds, preBuildByIndex, filePath, diagnostics);
-
             if (statement is ExpressionStatementSyntax exprStmt)
             {
+                if (exprStmt.Expression is InvocationExpressionSyntax buildInv
+                    && TryParseBuildStatement(buildInv, activeFactories, out PendingFactoryNode? pendingFactory))
+                {
+                    string? preBuildCode = ResolvePreBuildForBuildStatement(
+                        attachedPreBuilds,
+                        preBuildByIndex,
+                        boundPreBuildIndices,
+                        filePath,
+                        diagnostics);
+
+                    SetFactoryDisplayName(pendingFactory!, statementDisplayName, onlyIfUnset: true);
+                    string? rawKey = pendingFactory is PendingSplineFactory psRaw
+                        ? psRaw.Node.Key
+                        : ((PendingJunctionFactory)pendingFactory!).Node.Key;
+
+                    if (string.IsNullOrWhiteSpace(rawKey))
+                    {
+                        diagnostics.Add(new ParseDiagnostic(
+                            DiagnosticSeverity.Error,
+                            filePath,
+                            RoslynCsxHelpers.GetActualLine(sliced, exprStmt),
+                            RoslynCsxHelpers.GetColumn(exprStmt),
+                            "'.Build();' の前に '.Key = \"...\";' でキーを設定する必要があります。"));
+                        activeFactories.Remove(pendingFactory!.FactoryVarName);
+                        continue;
+                    }
+
+                    if (!usedNodeKeys.Add(rawKey))
+                    {
+                        diagnostics.Add(new ParseDiagnostic(
+                            DiagnosticSeverity.Error,
+                            filePath,
+                            RoslynCsxHelpers.GetActualLine(sliced, exprStmt),
+                            RoslynCsxHelpers.GetColumn(exprStmt),
+                            $"ノードの Key '{rawKey}' が重複しています。"));
+                        activeFactories.Remove(pendingFactory!.FactoryVarName);
+                        continue;
+                    }
+
+                    if (pendingFactory is PendingSplineFactory ps)
+                    {
+                        ps.Node.Id = rawKey;
+                        ps.Node.Key = rawKey;
+                        ps.Node.PreBuildUserCode = preBuildCode;
+                        builtSplineKeys.Add(rawKey);
+                        doc.Splines.Add(ps.Node);
+                        activeFactories.Remove(ps.FactoryVarName);
+                        continue;
+                    }
+
+                    if (pendingFactory is PendingJunctionFactory pj)
+                    {
+                        pj.Node.Id = rawKey;
+                        pj.Node.Key = rawKey;
+                        pj.Node.PreBuildUserCode = preBuildCode;
+                        builtJunctionKeys.Add(rawKey);
+                        doc.Junctions.Add(pj.Node);
+                        activeFactories.Remove(pj.FactoryVarName);
+                        continue;
+                    }
+                }
+
+                ReportOrphanPreBuilds(attachedPreBuilds, preBuildByIndex, filePath, diagnostics);
+
                 if (exprStmt.Expression is AssignmentExpressionSyntax factoryAssign
                     && factoryAssign.IsKind(SyntaxKind.SimpleAssignmentExpression)
                     && factoryAssign.Left is IdentifierNameSyntax reassignTarget
@@ -187,8 +205,8 @@ public static class WorldCsxSerializer
                     && TryParseFactoryStart(
                         reassignInv,
                         reassignTarget.Identifier.ValueText,
-                        splineBuiltVars,
-                        junctionBuiltVars,
+                        builtSplineKeys,
+                        builtJunctionKeys,
                         out PendingFactoryNode? reassignedFactory))
                 {
                     string factoryName = reassignTarget.Identifier.ValueText;
@@ -213,12 +231,16 @@ public static class WorldCsxSerializer
                     statementDisplayName,
                     doc,
                     activeFactories,
-                    splineBuiltVars,
-                    junctionBuiltVars,
+                    builtSplineKeys,
+                    builtJunctionKeys,
                     ref propCounter))
                 {
                     continue;
                 }
+            }
+            else
+            {
+                ReportOrphanPreBuilds(attachedPreBuilds, preBuildByIndex, filePath, diagnostics);
             }
 
             diagnostics.Add(new ParseDiagnostic(
@@ -283,7 +305,7 @@ public static class WorldCsxSerializer
         doc.RelativePath = relativePath;
         SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceText);
         SyntaxNode root = tree.GetRoot();
-        Dictionary<string, string> emptyMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        HashSet<string> emptySet = new(StringComparer.Ordinal);
         int propCounter = 0;
 
         foreach (InvocationExpressionSyntax inv in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
@@ -296,7 +318,7 @@ public static class WorldCsxSerializer
 
             if (rootReceiver is IdentifierNameSyntax rootGlobal)
             {
-                TryParseGlobalInvocation(rootGlobal.Identifier.ValueText, calls[0], doc, emptyMap, emptyMap);
+                TryParseGlobalInvocation(rootGlobal.Identifier.ValueText, calls[0], doc, emptySet, emptySet);
                 continue;
             }
 
@@ -432,54 +454,18 @@ public static class WorldCsxSerializer
             }
         }
 
-        HashSet<string> usedVars = new HashSet<string>(StringComparer.Ordinal) { "fSpline", "fJunction" };
+        HashSet<string> declaredAnchors = new HashSet<string>(StringComparer.Ordinal);
+        Dictionary<string, string> splineKeyById = new Dictionary<string, string>(StringComparer.Ordinal);
+        Dictionary<string, string> junctionKeyById = new Dictionary<string, string>(StringComparer.Ordinal);
+
         foreach (SplinePlacementNode s in document.Splines)
         {
-            foreach (SplineCurveSegment seg in s.Curves)
-            {
-                if (!string.IsNullOrEmpty(seg.OutputAnchorId))
-                {
-                    usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(seg.OutputAnchorId));
-                }
-            }
-
-            foreach (SplineGradientSegment seg in s.Gradients)
-            {
-                if (!string.IsNullOrEmpty(seg.OutputAnchorId))
-                {
-                    usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(seg.OutputAnchorId));
-                }
-            }
-
-            foreach (SplineCantSegment seg in s.Cants)
-            {
-                if (!string.IsNullOrEmpty(seg.OutputAnchorId))
-                {
-                    usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(seg.OutputAnchorId));
-                }
-            }
-
-            if (s.ConnectBezier is not null && !string.IsNullOrEmpty(s.ConnectBezier.OutputAnchorId))
-            {
-                usedVars.Add(DistanceExprCodec.FormatAnchorVariableName(s.ConnectBezier.OutputAnchorId));
-            }
+            splineKeyById[s.Id] = !string.IsNullOrWhiteSpace(s.Key) ? s.Key : s.Id;
         }
 
-        HashSet<string> declaredAnchors = new HashSet<string>(StringComparer.Ordinal);
-        Dictionary<string, string> splineBuiltVarById = new Dictionary<string, string>(StringComparer.Ordinal);
-        Dictionary<string, string> junctionBuiltVarById = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        foreach (NetworkNodeRef item in ordered)
+        foreach (JunctionPlacementNode j in document.Junctions)
         {
-            string builtVar = AllocateUniqueVar(item.Id, usedVars, item.IsJunction ? "junction" : "spline");
-            if (item.IsJunction)
-            {
-                junctionBuiltVarById[item.Id] = builtVar;
-            }
-            else
-            {
-                splineBuiltVarById[item.Id] = builtVar;
-            }
+            junctionKeyById[j.Id] = !string.IsNullOrWhiteSpace(j.Key) ? j.Key : j.Id;
         }
 
         bool declaredSplineFactory = false;
@@ -491,18 +477,18 @@ public static class WorldCsxSerializer
             if (!item.IsJunction)
             {
                 SplinePlacementNode spline = splineById[item.Id];
-                string builtVar = splineBuiltVarById[spline.Id];
+                string effectiveKey = splineKeyById[spline.Id];
                 bool declareFactory = !declaredSplineFactory;
                 declaredSplineFactory = true;
-                EmitSplineNode(sb, spline, "fSpline", declareFactory, builtVar, splineBuiltVarById, junctionBuiltVarById, declaredAnchors);
+                EmitSplineNode(sb, spline, "fSpline", declareFactory, effectiveKey, splineKeyById, junctionKeyById, declaredAnchors);
             }
             else
             {
                 JunctionPlacementNode junction = junctionById[item.Id];
-                string builtVar = junctionBuiltVarById[junction.Id];
+                string effectiveKey = junctionKeyById[junction.Id];
                 bool declareFactory = !declaredJunctionFactory;
                 declaredJunctionFactory = true;
-                EmitJunctionNode(sb, junction, "fJunction", declareFactory, builtVar, splineBuiltVarById, junctionBuiltVarById);
+                EmitJunctionNode(sb, junction, "fJunction", declareFactory, effectiveKey, splineKeyById, junctionKeyById);
             }
         }
 
@@ -512,30 +498,14 @@ public static class WorldCsxSerializer
             foreach (ExplicitPortConnection conn in document.Connections)
             {
                 sb.Append("    Network.Connect(")
-                    .Append(FormatPortReference(conn.From, splineBuiltVarById, junctionBuiltVarById))
+                    .Append(FormatPortReference(conn.From, splineKeyById, junctionKeyById))
                     .Append(", ")
-                    .Append(FormatPortReference(conn.To, splineBuiltVarById, junctionBuiltVarById))
+                    .Append(FormatPortReference(conn.To, splineKeyById, junctionKeyById))
                     .Append(");\n");
             }
         }
 
         return RoslynCsxHelpers.WrapCanonicalCsxFile(loads, sb.ToString(), document.UserCode);
-    }
-
-    private static string AllocateUniqueVar(string desired, HashSet<string> used, string fallbackPrefix)
-    {
-        string baseName = string.IsNullOrWhiteSpace(desired)
-            ? fallbackPrefix
-            : RoslynCsxHelpers.SanitizeIdentifier(desired);
-        string candidate = baseName;
-        int i = 2;
-        while (!used.Add(candidate))
-        {
-            candidate = $"{baseName}_{i}";
-            i++;
-        }
-
-        return candidate;
     }
 
     private static string FormatOutAnchor(string anchorId, HashSet<string> declaredAnchors)
@@ -549,9 +519,9 @@ public static class WorldCsxSerializer
         SplinePlacementNode spline,
         string factoryVar,
         bool declareFactory,
-        string builtVar,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars,
+        string effectiveKey,
+        IReadOnlyDictionary<string, string> splineKeys,
+        IReadOnlyDictionary<string, string> junctionKeys,
         HashSet<string> declaredAnchors)
     {
         if (!string.IsNullOrWhiteSpace(spline.DisplayName))
@@ -569,18 +539,18 @@ public static class WorldCsxSerializer
                 break;
 
             case SplineOriginKind.FromSplineOutlet:
-                string srcSplineVar = splineBuiltVars.TryGetValue(spline.Origin.SourceNodeId ?? string.Empty, out string? sv)
+                string srcSplineKey = splineKeys.TryGetValue(spline.Origin.SourceNodeId ?? string.Empty, out string? sv)
                     ? sv
-                    : RoslynCsxHelpers.SanitizeIdentifier(spline.Origin.SourceNodeId ?? "spline");
-                sb.Append(srcSplineVar).Append(".IntoSpline(")
+                    : (spline.Origin.SourceNodeId ?? string.Empty);
+                sb.Append("Network.Splines[").Append(RoslynCsxHelpers.FormatStringLiteral(srcSplineKey)).Append("].IntoSpline(")
                     .Append(RoslynCsxHelpers.FormatNullableStringLiteral(spline.TemplateKey)).Append(')');
                 break;
 
             case SplineOriginKind.FromJunctionPort:
-                string srcJunVar = junctionBuiltVars.TryGetValue(spline.Origin.SourceNodeId ?? string.Empty, out string? jv)
+                string srcJunKey = junctionKeys.TryGetValue(spline.Origin.SourceNodeId ?? string.Empty, out string? jv)
                     ? jv
-                    : RoslynCsxHelpers.SanitizeIdentifier(spline.Origin.SourceNodeId ?? "junction");
-                sb.Append(srcJunVar).Append(".IntoSpline(")
+                    : (spline.Origin.SourceNodeId ?? string.Empty);
+                sb.Append("Network.Junctions[").Append(RoslynCsxHelpers.FormatStringLiteral(srcJunKey)).Append("].IntoSpline(")
                     .Append(RoslynCsxHelpers.FormatStringLiteral(spline.Origin.SourcePortKey ?? string.Empty)).Append(", ")
                     .Append(RoslynCsxHelpers.FormatNullableStringLiteral(spline.TemplateKey)).Append(')');
                 break;
@@ -588,11 +558,8 @@ public static class WorldCsxSerializer
 
         sb.Append(";\n");
 
-        if (!string.IsNullOrEmpty(spline.Key))
-        {
-            sb.Append("    ").Append(factoryVar).Append(".Key = ")
-                .Append(RoslynCsxHelpers.FormatStringLiteral(spline.Key)).Append(";\n");
-        }
+        sb.Append("    ").Append(factoryVar).Append(".Key = ")
+            .Append(RoslynCsxHelpers.FormatStringLiteral(effectiveKey)).Append(";\n");
 
         if (0 < spline.Curves.Count)
         {
@@ -693,7 +660,7 @@ public static class WorldCsxSerializer
         {
             SplineConnectBezierModel cb = spline.ConnectBezier;
             sb.Append("    ").Append(factoryVar).Append(".ConnectBezier(")
-                .Append(FormatPortReference(cb.TargetPort, splineBuiltVars, junctionBuiltVars));
+                .Append(FormatPortReference(cb.TargetPort, splineKeys, junctionKeys));
             if (!string.IsNullOrEmpty(cb.OutputAnchorId))
             {
                 sb.Append(", ").Append(FormatOutAnchor(cb.OutputAnchorId, declaredAnchors));
@@ -734,12 +701,16 @@ public static class WorldCsxSerializer
                 .Append(RoslynCsxHelpers.FormatPoseArgs(prop.Pose)).Append(", ")
                 .Append(DistanceExprCodec.Format(prop.From)).Append(", ")
                 .Append(RoslynCsxHelpers.FormatNumber(prop.Span)).Append(", ")
-                .Append(RoslynCsxHelpers.FormatNumber(prop.Interval)).Append(", ")
-                .Append(prop.Count == int.MaxValue ? "int.MaxValue" : prop.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                .Append(");\n");
+                .Append(RoslynCsxHelpers.FormatNumber(prop.Interval));
+            if (prop.Count < int.MaxValue)
+            {
+                sb.Append(", ").Append(prop.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            sb.Append(");\n");
         }
 
-        EmitPreBuildAndBuild(sb, spline.PreBuildUserCode, builtVar, factoryVar);
+        EmitPreBuildAndBuild(sb, spline.PreBuildUserCode, factoryVar);
     }
 
     private static void EmitJunctionNode(
@@ -747,9 +718,9 @@ public static class WorldCsxSerializer
         JunctionPlacementNode junction,
         string factoryVar,
         bool declareFactory,
-        string builtVar,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars)
+        string effectiveKey,
+        IReadOnlyDictionary<string, string> splineKeys,
+        IReadOnlyDictionary<string, string> junctionKeys)
     {
         if (!string.IsNullOrWhiteSpace(junction.DisplayName))
         {
@@ -766,19 +737,19 @@ public static class WorldCsxSerializer
                 break;
 
             case JunctionOriginKind.FromSplineOutlet:
-                string srcSplineVar = splineBuiltVars.TryGetValue(junction.Origin.SourceNodeId ?? string.Empty, out string? sv)
+                string srcSplineKey = splineKeys.TryGetValue(junction.Origin.SourceNodeId ?? string.Empty, out string? sv)
                     ? sv
-                    : RoslynCsxHelpers.SanitizeIdentifier(junction.Origin.SourceNodeId ?? "spline");
-                sb.Append(srcSplineVar).Append(".IntoJunction(")
+                    : (junction.Origin.SourceNodeId ?? string.Empty);
+                sb.Append("Network.Splines[").Append(RoslynCsxHelpers.FormatStringLiteral(srcSplineKey)).Append("].IntoJunction(")
                     .Append(RoslynCsxHelpers.FormatStringLiteral(junction.TemplateKey)).Append(", ")
                     .Append(RoslynCsxHelpers.FormatStringLiteral(junction.Origin.TargetPortKey ?? string.Empty)).Append(')');
                 break;
 
             case JunctionOriginKind.FromJunctionPort:
-                string srcJunVar = junctionBuiltVars.TryGetValue(junction.Origin.SourceNodeId ?? string.Empty, out string? jv)
+                string srcJunKey = junctionKeys.TryGetValue(junction.Origin.SourceNodeId ?? string.Empty, out string? jv)
                     ? jv
-                    : RoslynCsxHelpers.SanitizeIdentifier(junction.Origin.SourceNodeId ?? "junction");
-                sb.Append(srcJunVar).Append(".IntoJunction(")
+                    : (junction.Origin.SourceNodeId ?? string.Empty);
+                sb.Append("Network.Junctions[").Append(RoslynCsxHelpers.FormatStringLiteral(srcJunKey)).Append("].IntoJunction(")
                     .Append(RoslynCsxHelpers.FormatStringLiteral(junction.Origin.SourcePortKey ?? string.Empty)).Append(", ")
                     .Append(RoslynCsxHelpers.FormatStringLiteral(junction.TemplateKey)).Append(", ")
                     .Append(RoslynCsxHelpers.FormatStringLiteral(junction.Origin.TargetPortKey ?? string.Empty)).Append(')');
@@ -787,11 +758,8 @@ public static class WorldCsxSerializer
 
         sb.Append(";\n");
 
-        if (!string.IsNullOrEmpty(junction.Key))
-        {
-            sb.Append("    ").Append(factoryVar).Append(".Key = ")
-                .Append(RoslynCsxHelpers.FormatStringLiteral(junction.Key)).Append(";\n");
-        }
+        sb.Append("    ").Append(factoryVar).Append(".Key = ")
+            .Append(RoslynCsxHelpers.FormatStringLiteral(effectiveKey)).Append(";\n");
 
         foreach (JunctionStaticPropPlacement prop in junction.Props)
         {
@@ -834,10 +802,10 @@ public static class WorldCsxSerializer
             }
         }
 
-        EmitPreBuildAndBuild(sb, junction.PreBuildUserCode, builtVar, factoryVar);
+        EmitPreBuildAndBuild(sb, junction.PreBuildUserCode, factoryVar);
     }
 
-    private static void EmitPreBuildAndBuild(StringBuilder sb, string? preBuildCode, string builtVar, string factoryVar)
+    private static void EmitPreBuildAndBuild(StringBuilder sb, string? preBuildCode, string factoryVar)
     {
         if (preBuildCode is not null)
         {
@@ -846,7 +814,7 @@ public static class WorldCsxSerializer
             sb.Append("    // </user-prebuild>\n");
         }
 
-        sb.Append("    var ").Append(builtVar).Append(" = ").Append(factoryVar).Append(".Build();\n");
+        sb.Append("    ").Append(factoryVar).Append(".Build();\n");
     }
 
     private static void EmitSkip(StringBuilder sb, string factoryVar, string method, SplineSkipRule skip)
@@ -864,21 +832,22 @@ public static class WorldCsxSerializer
 
     private static string FormatPortReference(
         PortReferenceModel portRef,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars)
+        IReadOnlyDictionary<string, string> splineKeys,
+        IReadOnlyDictionary<string, string> junctionKeys)
     {
         if (portRef.Kind == PortTargetKind.SplineInlet || portRef.Kind == PortTargetKind.SplineOutlet)
         {
-            string sVar = splineBuiltVars.TryGetValue(portRef.ElementId, out string? resolved)
+            string sKey = splineKeys.TryGetValue(portRef.ElementId, out string? resolved)
                 ? resolved
-                : RoslynCsxHelpers.SanitizeIdentifier(portRef.ElementId);
-            return portRef.Kind == PortTargetKind.SplineInlet ? $"{sVar}.Inlet" : $"{sVar}.Outlet";
+                : portRef.ElementId;
+            string sExpr = $"Network.Splines[{RoslynCsxHelpers.FormatStringLiteral(sKey)}]";
+            return portRef.Kind == PortTargetKind.SplineInlet ? $"{sExpr}.Inlet" : $"{sExpr}.Outlet";
         }
 
-        string jVar = junctionBuiltVars.TryGetValue(portRef.ElementId, out string? jResolved)
+        string jKey = junctionKeys.TryGetValue(portRef.ElementId, out string? jResolved)
             ? jResolved
-            : RoslynCsxHelpers.SanitizeIdentifier(portRef.ElementId);
-        return $"{jVar}.Junction.Ports[{RoslynCsxHelpers.FormatStringLiteral(portRef.PortKey ?? string.Empty)}]";
+            : portRef.ElementId;
+        return $"Network.Junctions[{RoslynCsxHelpers.FormatStringLiteral(jKey)}].Junction.Ports[{RoslynCsxHelpers.FormatStringLiteral(portRef.PortKey ?? string.Empty)}]";
     }
 
     private static string? ResolvePreBuildForBuildStatement(
@@ -926,7 +895,7 @@ public static class WorldCsxSerializer
                     filePath,
                     block.MarkerStartLine,
                     1,
-                    "'// <user-prebuild>' ブロックの直後には 'var ... = <factory>.Build();' が必要です。"));
+                    "'// <user-prebuild>' ブロックの直後には '<factory>.Build();' が必要です。"));
             }
         }
     }
@@ -948,11 +917,42 @@ public static class WorldCsxSerializer
         return activeFactories.TryGetValue(ident.Identifier.ValueText, out factory);
     }
 
+    private static bool TryParseNetworkNodeIndexer(ExpressionSyntax expr, out bool isJunction, out string nodeKey)
+    {
+        isJunction = false;
+        nodeKey = string.Empty;
+
+        if (expr is not ElementAccessExpressionSyntax elem
+            || elem.ArgumentList.Arguments.Count != 1
+            || !RoslynCsxHelpers.TryGetString(elem.ArgumentList.Arguments[0].Expression, out nodeKey)
+            || elem.Expression is not MemberAccessExpressionSyntax ma
+            || ma.Expression is not IdentifierNameSyntax netIdent
+            || netIdent.Identifier.ValueText != "Network")
+        {
+            return false;
+        }
+
+        string collName = ma.Name.Identifier.ValueText;
+        if (collName == "Splines")
+        {
+            isJunction = false;
+            return true;
+        }
+
+        if (collName == "Junctions")
+        {
+            isJunction = true;
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool TryParseFactoryStart(
         InvocationExpressionSyntax inv,
         string factoryVarName,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars,
+        IReadOnlySet<string> builtSplineKeys,
+        IReadOnlySet<string> builtJunctionKeys,
         out PendingFactoryNode? factory)
     {
         factory = null;
@@ -980,30 +980,31 @@ public static class WorldCsxSerializer
             return true;
         }
 
-        if (method == "IntoSpline" && ma.Expression is IdentifierNameSyntax srcSplineOrJunctionIdent)
+        if (method == "IntoSpline" && TryParseNetworkNodeIndexer(ma.Expression, out bool srcIsJunction, out string srcKey))
         {
-            string srcVar = srcSplineOrJunctionIdent.Identifier.ValueText;
-            if (args.Count == 1
-                && splineBuiltVars.TryGetValue(srcVar, out string? srcSplineId)
+            if (!srcIsJunction
+                && args.Count == 1
+                && builtSplineKeys.Contains(srcKey)
                 && RoslynCsxHelpers.TryGetNullableString(args[0].Expression, out string? splineTpl1))
             {
                 SplinePlacementNode node = new SplinePlacementNode
                 {
-                    Origin = SplineOriginModel.FromSpline(srcSplineId),
+                    Origin = SplineOriginModel.FromSpline(srcKey),
                     TemplateKey = splineTpl1,
                 };
                 factory = new PendingSplineFactory(factoryVarName, node);
                 return true;
             }
 
-            if (args.Count == 2
-                && junctionBuiltVars.TryGetValue(srcVar, out string? srcJunId)
+            if (srcIsJunction
+                && args.Count == 2
+                && builtJunctionKeys.Contains(srcKey)
                 && RoslynCsxHelpers.TryGetString(args[0].Expression, out string portKey)
                 && RoslynCsxHelpers.TryGetNullableString(args[1].Expression, out string? splineTpl2))
             {
                 SplinePlacementNode node = new SplinePlacementNode
                 {
-                    Origin = SplineOriginModel.FromJunction(srcJunId, portKey),
+                    Origin = SplineOriginModel.FromJunction(srcKey, portKey),
                     TemplateKey = splineTpl2,
                 };
                 factory = new PendingSplineFactory(factoryVarName, node);
@@ -1029,25 +1030,26 @@ public static class WorldCsxSerializer
             return true;
         }
 
-        if (method == "IntoJunction" && ma.Expression is IdentifierNameSyntax srcIdent)
+        if (method == "IntoJunction" && TryParseNetworkNodeIndexer(ma.Expression, out bool jSrcIsJunction, out string jSrcKey))
         {
-            string srcVar = srcIdent.Identifier.ValueText;
-            if (args.Count == 2
-                && splineBuiltVars.TryGetValue(srcVar, out string? srcSplineId)
+            if (!jSrcIsJunction
+                && args.Count == 2
+                && builtSplineKeys.Contains(jSrcKey)
                 && RoslynCsxHelpers.TryGetString(args[0].Expression, out string tplKey1)
                 && RoslynCsxHelpers.TryGetString(args[1].Expression, out string targetPortKey1))
             {
                 JunctionPlacementNode node = new JunctionPlacementNode
                 {
                     TemplateKey = tplKey1,
-                    Origin = JunctionOriginModel.FromSpline(srcSplineId, targetPortKey1),
+                    Origin = JunctionOriginModel.FromSpline(jSrcKey, targetPortKey1),
                 };
                 factory = new PendingJunctionFactory(factoryVarName, node);
                 return true;
             }
 
-            if (args.Count == 3
-                && junctionBuiltVars.TryGetValue(srcVar, out string? srcJunId)
+            if (jSrcIsJunction
+                && args.Count == 3
+                && builtJunctionKeys.Contains(jSrcKey)
                 && RoslynCsxHelpers.TryGetString(args[0].Expression, out string srcPortKey)
                 && RoslynCsxHelpers.TryGetString(args[1].Expression, out string tplKey2)
                 && RoslynCsxHelpers.TryGetString(args[2].Expression, out string targetPortKey2))
@@ -1055,7 +1057,7 @@ public static class WorldCsxSerializer
                 JunctionPlacementNode node = new JunctionPlacementNode
                 {
                     TemplateKey = tplKey2,
-                    Origin = JunctionOriginModel.FromJunction(srcJunId, srcPortKey, targetPortKey2),
+                    Origin = JunctionOriginModel.FromJunction(jSrcKey, srcPortKey, targetPortKey2),
                 };
                 factory = new PendingJunctionFactory(factoryVarName, node);
                 return true;
@@ -1169,8 +1171,8 @@ public static class WorldCsxSerializer
         string? displayName,
         WorldPlacementDocument doc,
         IReadOnlyDictionary<string, PendingFactoryNode> activeFactories,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars,
+        IReadOnlySet<string> builtSplineKeys,
+        IReadOnlySet<string> builtJunctionKeys,
         ref int propCounter)
     {
         if (expr is AssignmentExpressionSyntax assign
@@ -1207,7 +1209,7 @@ public static class WorldCsxSerializer
 
         if (calls.Count == 1
             && rootReceiver is IdentifierNameSyntax rootGlobal
-            && TryParseGlobalInvocation(rootGlobal.Identifier.ValueText, calls[0], doc, splineBuiltVars, junctionBuiltVars))
+            && TryParseGlobalInvocation(rootGlobal.Identifier.ValueText, calls[0], doc, builtSplineKeys, builtJunctionKeys))
         {
             return true;
         }
@@ -1234,7 +1236,7 @@ public static class WorldCsxSerializer
         {
             if (fNode is PendingSplineFactory psf && calls.Count == 1)
             {
-                return ApplySplineFactorySingleCall(calls[0], psf.Node, splineBuiltVars, junctionBuiltVars);
+                return ApplySplineFactorySingleCall(calls[0], psf.Node, builtSplineKeys, builtJunctionKeys);
             }
 
             if (fNode is PendingJunctionFactory pjf && calls.Count == 1)
@@ -1296,8 +1298,8 @@ public static class WorldCsxSerializer
         string receiverName,
         InvocationExpressionSyntax call,
         WorldPlacementDocument doc,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars)
+        IReadOnlySet<string> builtSplineKeys,
+        IReadOnlySet<string> builtJunctionKeys)
     {
         string? method = RoslynCsxHelpers.GetInvokedMethodName(call);
         SeparatedSyntaxList<ArgumentSyntax> args = call.ArgumentList.Arguments;
@@ -1381,8 +1383,8 @@ public static class WorldCsxSerializer
             case "Network":
                 if (method == "Connect"
                     && args.Count == 2
-                    && TryParsePortReference(args[0].Expression, splineBuiltVars, junctionBuiltVars, out PortReferenceModel? portA)
-                    && TryParsePortReference(args[1].Expression, splineBuiltVars, junctionBuiltVars, out PortReferenceModel? portB))
+                    && TryParsePortReference(args[0].Expression, builtSplineKeys, builtJunctionKeys, out PortReferenceModel? portA)
+                    && TryParsePortReference(args[1].Expression, builtSplineKeys, builtJunctionKeys, out PortReferenceModel? portB))
                 {
                     doc.Connections.Add(new ExplicitPortConnection(portA!, portB!));
                     return true;
@@ -1395,28 +1397,28 @@ public static class WorldCsxSerializer
 
     private static bool TryParsePortReference(
         ExpressionSyntax expr,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars,
+        IReadOnlySet<string> builtSplineKeys,
+        IReadOnlySet<string> builtJunctionKeys,
         out PortReferenceModel? portRef)
     {
         portRef = null;
 
-        if (expr is MemberAccessExpressionSyntax ma && ma.Expression is IdentifierNameSyntax sIdent)
+        if (expr is MemberAccessExpressionSyntax ma
+            && TryParseNetworkNodeIndexer(ma.Expression, out bool sIsJunction, out string splineKey)
+            && !sIsJunction
+            && builtSplineKeys.Contains(splineKey))
         {
-            if (splineBuiltVars.TryGetValue(sIdent.Identifier.ValueText, out string? splineId))
+            string prop = ma.Name.Identifier.ValueText;
+            if (prop == "Inlet")
             {
-                string prop = ma.Name.Identifier.ValueText;
-                if (prop == "Inlet")
-                {
-                    portRef = new PortReferenceModel(splineId, PortTargetKind.SplineInlet);
-                    return true;
-                }
+                portRef = new PortReferenceModel(splineKey, PortTargetKind.SplineInlet);
+                return true;
+            }
 
-                if (prop == "Outlet")
-                {
-                    portRef = new PortReferenceModel(splineId, PortTargetKind.SplineOutlet);
-                    return true;
-                }
+            if (prop == "Outlet")
+            {
+                portRef = new PortReferenceModel(splineKey, PortTargetKind.SplineOutlet);
+                return true;
             }
         }
 
@@ -1427,10 +1429,11 @@ public static class WorldCsxSerializer
             && portsAccess.Name.Identifier.ValueText == "Ports"
             && portsAccess.Expression is MemberAccessExpressionSyntax junctionProp
             && junctionProp.Name.Identifier.ValueText == "Junction"
-            && junctionProp.Expression is IdentifierNameSyntax jIdent
-            && junctionBuiltVars.TryGetValue(jIdent.Identifier.ValueText, out string? junctionId))
+            && TryParseNetworkNodeIndexer(junctionProp.Expression, out bool jIsJunction, out string junctionKey)
+            && jIsJunction
+            && builtJunctionKeys.Contains(junctionKey))
         {
-            portRef = new PortReferenceModel(junctionId, PortTargetKind.JunctionPort, portKey);
+            portRef = new PortReferenceModel(junctionKey, PortTargetKind.JunctionPort, portKey);
             return true;
         }
 
@@ -1440,8 +1443,8 @@ public static class WorldCsxSerializer
     private static bool ApplySplineFactorySingleCall(
         InvocationExpressionSyntax call,
         SplinePlacementNode node,
-        IReadOnlyDictionary<string, string> splineBuiltVars,
-        IReadOnlyDictionary<string, string> junctionBuiltVars)
+        IReadOnlySet<string> builtSplineKeys,
+        IReadOnlySet<string> builtJunctionKeys)
     {
         string? method = RoslynCsxHelpers.GetInvokedMethodName(call);
         SeparatedSyntaxList<ArgumentSyntax> args = call.ArgumentList.Arguments;
@@ -1453,7 +1456,7 @@ public static class WorldCsxSerializer
                 return false;
             }
 
-            if (!TryParsePortReference(args[0].Expression, splineBuiltVars, junctionBuiltVars, out PortReferenceModel? targetPort))
+            if (!TryParsePortReference(args[0].Expression, builtSplineKeys, builtJunctionKeys, out PortReferenceModel? targetPort))
             {
                 return false;
             }

@@ -390,6 +390,99 @@ public sealed class WorldProjectImporterTests
         Assert.Equal("Templates/Junctions/Junction.csx", WorldProjectStorage.BuildJunctionTemplateRelativePath("..."));
     }
 
+    [Fact]
+    public void Import_PreservesDisplayDirectives_AndResolvesOptionANetworkIndexers()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            string sourceWorldDir = Path.Combine(tempRoot, "SrcAuthor", "OptionAWorld");
+            Directory.CreateDirectory(sourceWorldDir);
+
+            string sourceXml = Path.Combine(tempRoot, "SrcAuthor.OptionAWorld.xml");
+            File.WriteAllText(sourceXml,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<WorldInfo>\n" +
+                "  <Title>OptionA</Title>\n" +
+                "  <Description>Display and indexer test</Description>\n" +
+                "  <Author>SrcAuthor</Author>\n" +
+                "  <Path>$(bin)TransportX.Scripting.dll</Path>\n" +
+                "  <Args><Arg>SrcAuthor\\OptionAWorld\\World.csx</Arg></Args>\n" +
+                "</WorldInfo>\n");
+
+            File.WriteAllText(Path.Combine(sourceWorldDir, "Init.csx"),
+                "Models.LoadList(\"Models.txt\");\n" +
+                "Network.LaneLayouts.Load(\"L1\", \"Layout.xml\");\n");
+            File.WriteAllText(Path.Combine(sourceWorldDir, "Models.txt"), "Dummy\tNONE\t$NonCollision\n");
+            File.WriteAllText(Path.Combine(sourceWorldDir, "Layout.xml"),
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<LaneLayout><Lanes><Lane Key=\"L0\" X=\"0\" Y=\"0\" FlowDirection=\"Out\" Width=\"3\" AllowedTraffic=\"All\" /></Lanes></LaneLayout>\n");
+
+            File.WriteAllText(Path.Combine(sourceWorldDir, "Templates.csx"),
+                "var tSpline = Network.Templates.CreateSpline(\"Spline1\", \"L1\");\n" +
+                "var tJunction = Network.Templates.CreateJunction(\"Junc1\");\n" +
+                "tJunction.AddPort(\"S\", \"L1\", 0, 0, 0, 0, 180, 0);\n" +
+                "tJunction.AddPort(\"N\", \"L1\", 0, 0, 10, 0, 0, 0);\n");
+
+            File.WriteAllText(Path.Combine(sourceWorldDir, "World.csx"),
+                "#load \"Init.csx\"\n" +
+                "#load \"Templates.csx\"\n" +
+                "Camera.Locate(0, 0, 0, 5, 10, 0, 0, 0);\n" +
+                "// <display name=\"駅前バス停\" />\n" +
+                "Chunks[0, 0].PutProp(\"Dummy\", 1, 0, 2);\n" +
+                "// <display name=\"1号線-本線\" />\n" +
+                "var fSpline = Chunks[0, 0].BeginSpline(\"Spline1\", 0, 0, 0);\n" +
+                "fSpline.Key = \"1号線-本線\";\n" +
+                "fSpline.Curves.Straight(30);\n" +
+                "fSpline.Build();\n" +
+                "var fJunction = Network.Splines[\"1号線-本線\"].IntoJunction(\"Junc1\", \"S\");\n" +
+                "fJunction.Key = \"交差点-N\";\n" +
+                "// <display name=\"北口交差点\" />\n" +
+                "fJunction.Build();\n" +
+                "// <display name=\"連絡線\" />\n" +
+                "fSpline = Network.Junctions[\"交差点-N\"].IntoSpline(\"N\", \"Spline1\");\n" +
+                "fSpline.Key = \"2号線\";\n" +
+                "fSpline.Curves.Straight(20);\n" +
+                "fSpline.Build();\n" +
+                "Network.Connect(Network.Splines[\"2号線\"].Outlet, Network.Junctions[\"交差点-N\"].Junction.Ports[\"N\"]);\n");
+
+            string destRoot = Path.Combine(tempRoot, "Dest");
+            WorldImportResult result = WorldProjectImporter.Import(new WorldImportOptions(
+                sourceXml,
+                destRoot,
+                "DestAuthor",
+                "OptionAWorld_Imported",
+                "Option A Imported",
+                "Test"));
+
+            Assert.True(result.Succeeded);
+            Assert.NotNull(result.Project);
+            WorldProject imported = result.Project!;
+
+            Assert.Equal("駅前バス停", Assert.Single(imported.Placement.Props).DisplayName);
+            Core.Models.Placement.SplinePlacementNode line1 = Assert.Single(imported.Placement.Splines, s => s.Key == "1号線-本線");
+            Assert.Equal("1号線-本線", line1.DisplayName);
+            Core.Models.Placement.JunctionPlacementNode junc = Assert.Single(imported.Placement.Junctions, j => j.Key == "交差点-N");
+            Assert.Equal("北口交差点", junc.DisplayName);
+            Assert.Equal("1号線-本線", junc.Origin.SourceNodeId);
+            Core.Models.Placement.SplinePlacementNode line2 = Assert.Single(imported.Placement.Splines, s => s.Key == "2号線");
+            Assert.Equal("連絡線", line2.DisplayName);
+            Assert.Equal("交差点-N", line2.Origin.SourceNodeId);
+            Assert.Single(imported.Placement.Connections);
+
+            WorldProjectLoadResult reloaded = WorldProjectStorage.Load(result.DestinationWorldInfoPath);
+            Assert.DoesNotContain(reloaded.Diagnostics, static d => d.Severity == DiagnosticSeverity.Error);
+            Assert.Equal("駅前バス停", Assert.Single(reloaded.Project.Placement.Props).DisplayName);
+            Assert.Equal("1号線-本線", Assert.Single(reloaded.Project.Placement.Splines, s => s.Key == "1号線-本線").DisplayName);
+            Assert.Equal("北口交差点", Assert.Single(reloaded.Project.Placement.Junctions, j => j.Key == "交差点-N").DisplayName);
+            Assert.Equal("連絡線", Assert.Single(reloaded.Project.Placement.Splines, s => s.Key == "2号線").DisplayName);
+        }
+        finally
+        {
+            DeleteTempDirectory(tempRoot);
+        }
+    }
+
     private sealed class DummyGraphicsClient : IGraphicsClient
     {
         public nint Hwnd => 0;

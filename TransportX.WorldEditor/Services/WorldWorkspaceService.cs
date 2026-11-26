@@ -2578,7 +2578,7 @@ public sealed class WorldWorkspaceService : IDisposable
             return false;
         }
 
-        if (!CSharpIdentifierUtilities.TryValidateIdentifier(requestedKey, out string reason))
+        if (!CSharpIdentifierUtilities.TryValidateNodeKey(requestedKey, out string reason))
         {
             LastStatusMessage.Value = reason;
             return false;

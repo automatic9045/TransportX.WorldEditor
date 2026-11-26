@@ -180,15 +180,7 @@
               <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding PropRuleKey.Value, Mode=TwoWay}" />
 
               <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="ModelKeys" />
-              <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
-                <TextBox Text="{Binding PropModelKeysText.Value, Mode=TwoWay}" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
-                  <ComboBox Grid.Column="0" HorizontalAlignment="Stretch"
-                            ItemsSource="{Binding AvailableModelKeys}"
-                            SelectedItem="{Binding PropModelKeyToAdd.Value, Mode=TwoWay}" />
-                  <Button Grid.Column="1" Content="+" Padding="7,2" Command="{Binding AppendModelKeyToPropCommand}" />
-                </Grid>
-              </StackPanel>
+              <ctrl:PropModelKeysEditor Grid.Row="1" Grid.Column="1" DataContext="{Binding PropModelsEditor}" />
 
               <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="Span (m, 0=終端)" />
               <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding PropSpan.Value, Mode=TwoWay}" Minimum="0" Increment="5" FormatString="0.###" />
@@ -197,7 +189,7 @@
               <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding PropInterval.Value, Mode=TwoWay}" Minimum="0" Increment="1" FormatString="0.###" />
 
               <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="最大個数" />
-              <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding PropCount.Value, Mode=TwoWay}" Minimum="1" Increment="1" FormatString="0" />
+              <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding PropCount.Value, Mode=TwoWay}" Minimum="1" Increment="1" FormatString="0" Watermark="無制限" />
 
               <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="位置 (X, Y, Z)" />
               <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,4,*,4,*">
@@ -250,7 +242,9 @@
             <!-- 6. Skip Rule Key -->
             <Grid ColumnDefinitions="115,*" ColumnSpacing="6" IsVisible="{Binding IsSkipSelected.Value}">
               <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12" Text="対象 Rule Key" />
-              <TextBox Grid.Column="1" Text="{Binding SkipRuleKey.Value, Mode=TwoWay}" Watermark="テンプレート上の Key" />
+              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding AvailableSkipKeys}"
+                        SelectedItem="{Binding SkipRuleKey.Value, Mode=TwoWay}" />
             </Grid>
 
             <!-- Shared 3-Part AnchoredDistance Picker: From -->

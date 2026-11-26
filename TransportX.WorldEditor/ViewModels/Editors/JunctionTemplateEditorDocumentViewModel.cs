@@ -9,6 +9,7 @@ using TransportX.WorldEditor.Core.Models.Primitives;
 using TransportX.WorldEditor.Core.Models.Templates;
 using TransportX.WorldEditor.Core.Validation;
 using TransportX.WorldEditor.Services;
+using TransportX.WorldEditor.ViewModels.Controls;
 using TransportX.WorldEditor.ViewModels.Dock;
 
 namespace TransportX.WorldEditor.ViewModels.Editors;
@@ -167,6 +168,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
     public BindableReactiveProperty<bool> HasSelectedPathProp { get; }
     public BindableReactiveProperty<string> PathPropModelKeysText { get; }
     public BindableReactiveProperty<string> PathPropModelToAdd { get; }
+    public PropModelKeysEditorViewModel PathPropModelsEditor { get; }
     public BindableReactiveProperty<decimal?> PathPropPosX { get; }
     public BindableReactiveProperty<decimal?> PathPropPosY { get; }
     public BindableReactiveProperty<decimal?> PathPropPosZ { get; }
@@ -228,6 +230,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
     public BindableReactiveProperty<bool> HasSelectedCurveProp { get; }
     public BindableReactiveProperty<string> CurvePropModelKeysText { get; }
     public BindableReactiveProperty<string> CurvePropModelToAdd { get; }
+    public PropModelKeysEditorViewModel CurvePropModelsEditor { get; }
     public BindableReactiveProperty<decimal?> CurvePropPosX { get; }
     public BindableReactiveProperty<decimal?> CurvePropPosY { get; }
     public BindableReactiveProperty<decimal?> CurvePropPosZ { get; }
@@ -395,6 +398,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
         HasSelectedPathProp = new BindableReactiveProperty<bool>(false).AddTo(Disposables);
         PathPropModelKeysText = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
         PathPropModelToAdd = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
+        PathPropModelsEditor = new PropModelKeysEditorViewModel(AvailableModelKeys, PathPropModelKeysText, PathPropModelToAdd).AddTo(Disposables);
         PathPropPosX = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PathPropPosY = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PathPropPosZ = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
@@ -451,6 +455,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
         HasSelectedCurveProp = new BindableReactiveProperty<bool>(false).AddTo(Disposables);
         CurvePropModelKeysText = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
         CurvePropModelToAdd = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
+        CurvePropModelsEditor = new PropModelKeysEditorViewModel(AvailableModelKeys, CurvePropModelKeysText, CurvePropModelToAdd).AddTo(Disposables);
         CurvePropPosX = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         CurvePropPosY = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         CurvePropPosZ = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
@@ -1143,7 +1148,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
 
             HasSelectedPathProp.Value = true;
             CurvePropPlacementRule pr = path.Props[row.Index];
-            PathPropModelKeysText.Value = string.Join(", ", pr.ModelKeys);
+            PathPropModelKeysText.Value = PropModelKeysTextHelper.Format(pr.ModelKeys);
             PathPropPosX.Value = (decimal)pr.Pose.X;
             PathPropPosY.Value = (decimal)pr.Pose.Y;
             PathPropPosZ.Value = (decimal)pr.Pose.Z;
@@ -1336,7 +1341,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
 
             HasSelectedCurveProp.Value = true;
             CurvePropPlacementRule pr = curve.Props[row.Index];
-            CurvePropModelKeysText.Value = string.Join(", ", pr.ModelKeys);
+            CurvePropModelKeysText.Value = PropModelKeysTextHelper.Format(pr.ModelKeys);
             CurvePropPosX.Value = (decimal)pr.Pose.X;
             CurvePropPosY.Value = (decimal)pr.Pose.Y;
             CurvePropPosZ.Value = (decimal)pr.Pose.Z;
@@ -2793,10 +2798,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
             Interval = double.Max(0.0, (double)(interval ?? 1m)),
             Count = count.HasValue && 0m < count.Value ? (int)count.Value : int.MaxValue,
         };
-        foreach (string part in modelKeysText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            rule.ModelKeys.Add(part);
-        }
+        rule.ModelKeys.AddRange(PropModelKeysTextHelper.Parse(modelKeysText));
 
         return rule;
     }
@@ -2831,8 +2833,7 @@ public sealed class JunctionTemplateEditorDocumentViewModel : EditorDocumentBase
             return;
         }
 
-        string current = targetText.Value.Trim();
-        targetText.Value = string.IsNullOrEmpty(current) ? addition : $"{current}, {addition}";
+        targetText.Value = PropModelKeysTextHelper.Append(targetText.Value, addition);
     }
 
     private static double? ResolveAnchorS(

@@ -30,6 +30,7 @@ using TransportX.WorldEditor.Rendering.Worlds;
 using TransportX.WorldEditor.Serialization.Storage;
 using TransportX.WorldEditor.Services;
 using TransportX.WorldEditor.ViewModels;
+using TransportX.WorldEditor.ViewModels.Controls;
 using TransportX.WorldEditor.ViewModels.Dock;
 using TransportX.WorldEditor.ViewModels.Editors;
 using TransportX.WorldEditor.Views;
@@ -943,6 +944,109 @@ public sealed class Phase4SplineAndNetworkTests
             inspector.AddNewBackgroundCommand.Execute(Unit.Default);
             Assert.NotEmpty(inspector.AvailableModelKeys);
             Assert.False(string.IsNullOrWhiteSpace(inspector.SelectedBackgroundModelKey.Value));
+        }
+        finally
+        {
+            DeleteTempDirectory(tempDir);
+        }
+    }
+
+    [Fact]
+    public void SplineTimeline_PropCountDefaultsToUnlimited_SkipKeysPopulateDropdown_AndEmptyModelKeysPreserved()
+    {
+        Assert.Empty(PropModelKeysTextHelper.Parse(string.Empty));
+        Assert.Equal(["PoleA"], PropModelKeysTextHelper.Parse("PoleA"));
+        Assert.Equal(["PoleA", ""], PropModelKeysTextHelper.Parse("PoleA, "));
+        Assert.Equal(["", "PoleA"], PropModelKeysTextHelper.Parse(", PoleA"));
+        Assert.Equal(["PoleA", "", "PoleB"], PropModelKeysTextHelper.Parse("PoleA, , PoleB"));
+        Assert.Equal("PoleA, , PoleB", PropModelKeysTextHelper.Append("PoleA, ", "PoleB"));
+
+        string tempDir = CreateTempDirectory();
+        try
+        {
+            using MainWindowViewModel shell = new();
+            WorldProject project = shell.CreateAndActivateWorld(tempDir, "Author", "PropAndSkipWorld", "Test", "Desc");
+            SplinePlacementNode spline = project.Placement.Splines[0];
+
+            SplineTemplateDocument tpl = project.SplineTemplates[spline.TemplateKey!];
+            tpl.Props.Add(new SplineTemplatePropRule { Key = "TplProp1", Interval = 10.0 });
+            tpl.Extrusions.Add(new SplineTemplateExtrusionRule { Key = "RoadSurface", CrossSectionKey = "Main" });
+            spline.Extrusions.Add(new CurveExtrusionPlacementRule { Key = "LocalExt", CrossSectionKey = "Main" });
+
+            shell.Workspace.SelectedSplineId.Value = spline.Id;
+            TimelineToolViewModel timeline = shell.TimelineTool;
+
+            // Default Prop count is unlimited (int.MaxValue -> null in UI)
+            timeline.AddPropCommand.Execute(Unit.Default);
+            Assert.Single(spline.Props);
+            Assert.Equal(int.MaxValue, spline.Props[0].Count);
+            Assert.Null(timeline.PropCount.Value);
+
+            timeline.PropCount.Value = 5m;
+            Assert.Equal(5, spline.Props[0].Count);
+
+            timeline.PropCount.Value = null;
+            Assert.Equal(int.MaxValue, spline.Props[0].Count);
+
+            // Empty model slot preserved in comma-separated text
+            timeline.PropModelKeysText.Value = "PoleA, , PoleB";
+            Assert.Equal(["PoleA", "", "PoleB"], spline.Props[0].ModelKeys);
+            Assert.Equal(3, timeline.PropModelsEditor.Slots.Count);
+            Assert.Equal(PropModelKeysEditorViewModel.EmptyChoice, timeline.PropModelsEditor.Slots[1].SelectedChoice.Value);
+
+            // Reorder, replace, append empty/selected, and remove via PropModelsEditor
+            timeline.PropModelsEditor.Slots[1].MoveUpCommand.Execute(Unit.Default);
+            Assert.Equal(["", "PoleA", "PoleB"], spline.Props[0].ModelKeys);
+            timeline.PropModelsEditor.Slots[1].RemoveCommand.Execute(Unit.Default);
+            Assert.Equal(["", "PoleB"], spline.Props[0].ModelKeys);
+            timeline.PropModelsEditor.AppendEmptyModelCommand.Execute(Unit.Default);
+            Assert.Equal(["", "PoleB", ""], spline.Props[0].ModelKeys);
+
+            timeline.PropModelKeysText.Value = string.Empty;
+            Assert.Empty(spline.Props[0].ModelKeys);
+            timeline.PropModelsEditor.AppendEmptyModelCommand.Execute(Unit.Default);
+            Assert.Single(timeline.PropModelsEditor.Slots);
+            timeline.PropModelKeyToAdd.Value = "PoleC";
+            timeline.PropModelsEditor.AppendSelectedModelCommand.Execute(Unit.Default);
+            Assert.Equal(["", "PoleC"], spline.Props[0].ModelKeys);
+
+            timeline.PropModelKeysText.Value = "PoleA, ";
+            Assert.Equal(["PoleA", ""], spline.Props[0].ModelKeys);
+
+            // SkipRuleKey dropdown candidates come from Template + Spline keyed rules
+            timeline.AddPropSkipCommand.Execute(Unit.Default);
+            Assert.Equal(["TplProp1", "Prop1"], timeline.AvailableSkipKeys);
+            Assert.Equal("TplProp1", timeline.SkipRuleKey.Value);
+
+            // Custom/prebuild skip key already on spline must still stay visible in dropdown
+            spline.ExtrusionSkips.Add(new SplineSkipRule("PrebuildExtKey"));
+            timeline.SelectTrackItem(SplineTimelineTrackKind.ExtrusionSkips, 0);
+            Assert.Contains("RoadSurface", timeline.AvailableSkipKeys);
+            Assert.Contains("LocalExt", timeline.AvailableSkipKeys);
+            Assert.Contains("PrebuildExtKey", timeline.AvailableSkipKeys);
+            Assert.Equal("PrebuildExtKey", timeline.SkipRuleKey.Value);
+
+            if (OperatingSystem.IsWindows())
+            {
+                Exception? uiException = null;
+                AvaloniaUiTestHost.Run(() =>
+                {
+                    try
+                    {
+                        PropModelKeysEditor editorControl = new()
+                        {
+                            DataContext = timeline.PropModelsEditor,
+                        };
+                        MeasureAndArrange(editorControl, timeline.PropModelsEditor, 320, 200);
+                        Assert.True(0.0 < editorControl.Bounds.Width);
+                    }
+                    catch (Exception ex)
+                    {
+                        uiException = ex;
+                    }
+                });
+                Assert.Null(uiException);
+            }
         }
         finally
         {

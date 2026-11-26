@@ -11,6 +11,7 @@ using TransportX.WorldEditor.Core.Models.Primitives;
 using TransportX.WorldEditor.Core.Models.Templates;
 using TransportX.WorldEditor.Core.Validation;
 using TransportX.WorldEditor.Services;
+using TransportX.WorldEditor.ViewModels.Controls;
 
 namespace TransportX.WorldEditor.ViewModels.Dock;
 
@@ -83,6 +84,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
     public ObservableCollection<string> AvailableToAnchorNames { get; } = new();
     public ObservableCollection<string> AvailableCrossSectionKeys { get; } = new();
     public ObservableCollection<string> AvailableModelKeys { get; } = new();
+    public ObservableCollection<string> AvailableSkipKeys { get; } = new();
     public ObservableCollection<SplineTimelineBlockItem> TimelineBlocks { get; } = new();
 
     public BindableReactiveProperty<SplineTimelineTrackKind?> SelectedTrackKind { get; }
@@ -128,6 +130,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
     public BindableReactiveProperty<string> PropRuleKey { get; }
     public BindableReactiveProperty<string> PropModelKeysText { get; }
     public BindableReactiveProperty<string> PropModelKeyToAdd { get; }
+    public PropModelKeysEditorViewModel PropModelsEditor { get; }
     public BindableReactiveProperty<decimal?> PropPosX { get; }
     public BindableReactiveProperty<decimal?> PropPosY { get; }
     public BindableReactiveProperty<decimal?> PropPosZ { get; }
@@ -240,6 +243,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
         PropRuleKey = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
         PropModelKeysText = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
         PropModelKeyToAdd = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
+        PropModelsEditor = new PropModelKeysEditorViewModel(AvailableModelKeys, PropModelKeysText, PropModelKeyToAdd).AddTo(Disposables);
         PropPosX = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PropPosY = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PropPosZ = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
@@ -248,7 +252,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
         PropRotZ = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PropSpan = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PropInterval = new BindableReactiveProperty<decimal?>(20m).AddTo(Disposables);
-        PropCount = new BindableReactiveProperty<decimal?>(100m).AddTo(Disposables);
+        PropCount = new BindableReactiveProperty<decimal?>(null).AddTo(Disposables);
 
         ExtRuleKey = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
         ExtCrossSectionKey = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
@@ -483,6 +487,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
                 AvailableAnchorNames.Clear();
                 AvailableCrossSectionKeys.Clear();
                 AvailableModelKeys.Clear();
+                AvailableSkipKeys.Clear();
                 TimelineBlocks.Clear();
                 HasSelectedSpline.Value = false;
                 HeaderTitle.Value = "スプライン未選択";
@@ -749,6 +754,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
 
             if (!valid || spline is null || !track.HasValue)
             {
+                AvailableSkipKeys.Clear();
                 return;
             }
 
@@ -798,7 +804,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
                 {
                     SplineInstancePropRule prop = spline.Props[idx];
                     PropRuleKey.Value = prop.Key ?? string.Empty;
-                    PropModelKeysText.Value = string.Join(", ", prop.ModelKeys);
+                    PropModelKeysText.Value = PropModelKeysTextHelper.Format(prop.ModelKeys);
                     PropPosX.Value = (decimal)prop.Pose.X;
                     PropPosY.Value = (decimal)prop.Pose.Y;
                     PropPosZ.Value = (decimal)prop.Pose.Z;
@@ -807,7 +813,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
                     PropRotZ.Value = (decimal)prop.Pose.RotationZ;
                     PropSpan.Value = (decimal)prop.Span;
                     PropInterval.Value = (decimal)prop.Interval;
-                    PropCount.Value = prop.Count;
+                    PropCount.Value = prop.Count == int.MaxValue ? null : prop.Count;
                     PopulateDistancePicker(true, prop.From, anchorMap, isFrom: true);
                     break;
                 }
@@ -832,9 +838,11 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
                 case SplineTimelineTrackKind.PropSkips:
                 case SplineTimelineTrackKind.ExtrusionSkips:
                 {
-                    SplineSkipRule skip = track.Value == SplineTimelineTrackKind.PropSkips
+                    bool isPropSkip = track.Value == SplineTimelineTrackKind.PropSkips;
+                    SplineSkipRule skip = isPropSkip
                         ? spline.PropSkips[idx]
                         : spline.ExtrusionSkips[idx];
+                    RebuildAvailableSkipKeys(spline, isPropSkip, skip.Key);
                     SkipRuleKey.Value = skip.Key;
                     PopulateDistancePicker(skip.From.HasValue, skip.From ?? AnchoredDistance.Zero, anchorMap, isFrom: true);
                     PopulateDistancePicker(skip.To.HasValue, skip.To ?? AnchoredDistance.Absolute(TotalCurveLength.Value), anchorMap, isFrom: false);
@@ -1233,15 +1241,9 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
                     From = ReadFromPickerDistance(),
                     Span = double.Max(0.0, (double)(PropSpan.Value ?? 0m)),
                     Interval = double.Max(0.0, (double)(PropInterval.Value ?? 0m)),
-                    Count = int.Max(1, (int)(PropCount.Value ?? 100m)),
+                    Count = PropCount.Value.HasValue ? int.Max(1, (int)PropCount.Value.Value) : int.MaxValue,
                 };
-                string[] parsedKeys = PropModelKeysText.Value.Split(
-                    ',',
-                    StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                foreach (string mk in parsedKeys)
-                {
-                    updated.ModelKeys.Add(mk);
-                }
+                updated.ModelKeys.AddRange(PropModelKeysTextHelper.Parse(PropModelKeysText.Value));
 
                 draft.Props[idx] = updated;
                 mergeKey = $"Timeline.{current.Id}.Prop.{idx}";
@@ -1274,7 +1276,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
             case SplineTimelineTrackKind.PropSkips:
             {
                 SplineSkipRule updated = new(
-                    SkipRuleKey.Value.Trim(),
+                    (SkipRuleKey.Value ?? string.Empty).Trim(),
                     HasFromDistance.Value ? ReadFromPickerDistance() : null,
                     HasToDistance.Value ? ReadToPickerDistance() : null);
                 draft.PropSkips[idx] = updated;
@@ -1286,7 +1288,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
             case SplineTimelineTrackKind.ExtrusionSkips:
             {
                 SplineSkipRule updated = new(
-                    SkipRuleKey.Value.Trim(),
+                    (SkipRuleKey.Value ?? string.Empty).Trim(),
                     HasFromDistance.Value ? ReadFromPickerDistance() : null,
                     HasToDistance.Value ? ReadToPickerDistance() : null);
                 draft.ExtrusionSkips[idx] = updated;
@@ -1376,7 +1378,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
             From = AnchoredDistance.Zero,
             Span = 0.0,
             Interval = 20.0,
-            Count = 100,
+            Count = int.MaxValue,
         };
         if (0 < AvailableModelKeys.Count)
         {
@@ -1580,8 +1582,7 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
             return;
         }
 
-        string current = PropModelKeysText.Value.Trim();
-        PropModelKeysText.Value = string.IsNullOrEmpty(current) ? key : $"{current}, {key}";
+        PropModelKeysText.Value = PropModelKeysTextHelper.Append(PropModelKeysText.Value, key);
     }
 
     private static int ExpandAnchorBeforeRemoval(
@@ -1689,8 +1690,32 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
         return false;
     }
 
-    private string ResolveDefaultSkipKey(SplinePlacementNode spline, bool isProp)
+    private void RebuildAvailableSkipKeys(SplinePlacementNode spline, bool isProp, string? currentKey)
     {
+        List<string> nextKeys = CollectCandidateSkipKeys(spline, isProp);
+        if (!string.IsNullOrWhiteSpace(currentKey) && !nextKeys.Contains(currentKey, StringComparer.Ordinal))
+        {
+            nextKeys.Add(currentKey);
+        }
+
+        SyncStringCollection(AvailableSkipKeys, nextKeys);
+    }
+
+    private List<string> CollectCandidateSkipKeys(SplinePlacementNode spline, bool isProp)
+    {
+        List<string> keys = new();
+        void AddIfNew(string? rawKey)
+        {
+            if (!string.IsNullOrWhiteSpace(rawKey))
+            {
+                string trimmed = rawKey.Trim();
+                if (!keys.Contains(trimmed, StringComparer.Ordinal))
+                {
+                    keys.Add(trimmed);
+                }
+            }
+        }
+
         WorldProject? project = Workspace?.CurrentProject.Value;
         if (project is not null
             && !string.IsNullOrEmpty(spline.TemplateKey)
@@ -1700,25 +1725,40 @@ public sealed class TimelineToolViewModel : Tool, IDisposable
             {
                 foreach (SplineTemplatePropRule p in tpl.Props)
                 {
-                    if (!string.IsNullOrWhiteSpace(p.Key))
-                    {
-                        return p.Key;
-                    }
+                    AddIfNew(p.Key);
                 }
             }
             else
             {
                 foreach (SplineTemplateExtrusionRule ext in tpl.Extrusions)
                 {
-                    if (!string.IsNullOrWhiteSpace(ext.Key))
-                    {
-                        return ext.Key;
-                    }
+                    AddIfNew(ext.Key);
                 }
             }
         }
 
-        return isProp ? "Prop1" : "RoadSurface";
+        if (isProp)
+        {
+            foreach (SplineInstancePropRule p in spline.Props)
+            {
+                AddIfNew(p.Key);
+            }
+        }
+        else
+        {
+            foreach (CurveExtrusionPlacementRule ext in spline.Extrusions)
+            {
+                AddIfNew(ext.Key);
+            }
+        }
+
+        return keys;
+    }
+
+    private string ResolveDefaultSkipKey(SplinePlacementNode spline, bool isProp)
+    {
+        List<string> keys = CollectCandidateSkipKeys(spline, isProp);
+        return 0 < keys.Count ? keys[0] : string.Empty;
     }
 
     private static (double StartS, double EndS, bool Unresolved) ResolveSkipSpan(

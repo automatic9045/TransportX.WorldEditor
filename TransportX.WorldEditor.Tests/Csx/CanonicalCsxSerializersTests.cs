@@ -368,6 +368,16 @@ public sealed class CanonicalCsxSerializersTests
         Assert.Contains("out var s_s_end", generated, System.StringComparison.Ordinal);
         Assert.Contains("out var s_s_loop", generated, System.StringComparison.Ordinal);
         Assert.Contains("s_s_mid - 5", generated, System.StringComparison.Ordinal);
+        Assert.Contains("    fSpline.Key = \"MainApproach\";", generated, System.StringComparison.Ordinal);
+        Assert.Contains("    fSpline.Build();", generated, System.StringComparison.Ordinal);
+        Assert.Contains("    fJunction.Key = \"junction_001\";", generated, System.StringComparison.Ordinal);
+        Assert.Contains("    fJunction.Build();", generated, System.StringComparison.Ordinal);
+        Assert.Contains("    var fJunction = Network.Splines[\"MainApproach\"].IntoJunction(\"3Forked1\", \"S\");", generated, System.StringComparison.Ordinal);
+        Assert.Contains("    fSpline = Network.Junctions[\"junction_001\"].IntoSpline(\"E\", \"Spline1\");", generated, System.StringComparison.Ordinal);
+        Assert.Contains("    Network.Connect(Network.Splines[\"spline_002\"].Outlet, Network.Junctions[\"junction_001\"].Junction.Ports[\"N\"]);", generated, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("var MainApproach =", generated, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("var junction_001 =", generated, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("var spline_002 =", generated, System.StringComparison.Ordinal);
 
         int idxS1 = generated.IndexOf("    var fSpline =", System.StringComparison.Ordinal);
         int idxJ1 = generated.IndexOf("    var fJunction =", System.StringComparison.Ordinal);
@@ -431,7 +441,8 @@ public sealed class CanonicalCsxSerializersTests
             "    f_s1.SpeedLimit(1, 50);",
             "    // </user-prebuild>",
             "    f_s1.Curves.Straight(10);",
-            "    var s1 = f_s1.Build();",
+            "    f_s1.Key = \"s1\";",
+            "    f_s1.Build();",
             "    // </editor-generated>",
             "}",
         ]);
@@ -446,8 +457,9 @@ public sealed class CanonicalCsxSerializersTests
             "{",
             "    // <editor-generated version=\"1\">",
             "    var fSpline = Chunks[0, 0].BeginSpline(\"Spline1\", 0, 0, 0);",
+            "    fSpline.Key = \"s1\";",
             "    fSpline.Curves.Straight(10, out var foo);",
-            "    var s1 = fSpline.Build();",
+            "    fSpline.Build();",
             "    // </editor-generated>",
             "}",
         ]);
@@ -455,5 +467,95 @@ public sealed class CanonicalCsxSerializersTests
         (ParsedWorldCsx? res3, IReadOnlyList<ParseDiagnostic> diag3) = WorldCsxSerializer.Parse("World.csx", unprefixedAnchorCsx);
         Assert.Null(res3);
         Assert.Contains(diag3, d => d.Severity == DiagnosticSeverity.Error);
+
+        string missingKeyCsx = string.Join('\n',
+        [
+            "#load \"__Editor.csx\"",
+            "{",
+            "    // <editor-generated version=\"1\">",
+            "    var fSpline = Chunks[0, 0].BeginSpline(\"Spline1\", 0, 0, 0);",
+            "    fSpline.Curves.Straight(10);",
+            "    fSpline.Build();",
+            "    // </editor-generated>",
+            "}",
+        ]);
+
+        (ParsedWorldCsx? res4, IReadOnlyList<ParseDiagnostic> diag4) = WorldCsxSerializer.Parse("World.csx", missingKeyCsx);
+        Assert.Null(res4);
+        Assert.Contains(diag4, d => d.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void PutProp_InfiniteCountOmitsCountOverload_AndPreservesEmptyModelKey()
+    {
+        WorldPlacementDocument doc = new WorldPlacementDocument();
+        SplinePlacementNode spline = new SplinePlacementNode
+        {
+            Id = "spline_001",
+            TemplateKey = "Spline1",
+        };
+        spline.Curves.Add(new SplineCurveSegment(SplineCurveSegmentKind.Straight, 0.0, 40.0));
+
+        SplineInstancePropRule infiniteProp = new SplineInstancePropRule
+        {
+            Key = null,
+            Pose = PoseDegreesModel.Identity,
+            From = AnchoredDistance.Zero,
+            Span = 0.0,
+            Interval = 5.0,
+            Count = int.MaxValue,
+        };
+        infiniteProp.ModelKeys.Add("PoleA");
+        infiniteProp.ModelKeys.Add(string.Empty);
+        infiniteProp.ModelKeys.Add("PoleB");
+        spline.Props.Add(infiniteProp);
+
+        SplineInstancePropRule finiteProp = new SplineInstancePropRule
+        {
+            Key = "Finite",
+            Pose = PoseDegreesModel.Identity,
+            From = AnchoredDistance.Zero,
+            Span = 0.0,
+            Interval = 5.0,
+            Count = 3,
+        };
+        finiteProp.ModelKeys.Add("Marker");
+        spline.Props.Add(finiteProp);
+        doc.Splines.Add(spline);
+
+        JunctionPlacementNode junc = new JunctionPlacementNode
+        {
+            Id = "junction_001",
+            TemplateKey = "3Forked1",
+        };
+        JunctionPathOverrideModel pathOv = new JunctionPathOverrideModel
+        {
+            PathKey = "NS",
+        };
+        CurvePropPlacementRule curveInfiniteProp = new CurvePropPlacementRule
+        {
+            Interval = 2.0,
+            Count = int.MaxValue,
+        };
+        curveInfiniteProp.ModelKeys.Add("Guide");
+        curveInfiniteProp.ModelKeys.Add(string.Empty);
+        pathOv.Props.Add(curveInfiniteProp);
+        junc.PathOverrides.Add(pathOv);
+        doc.Junctions.Add(junc);
+
+        string csx = WorldCsxSerializer.Generate(doc, ["Templates/Splines/Spline1.csx", "Templates/Junctions/3Forked1.csx"]);
+        Assert.DoesNotContain("int.MaxValue", csx, System.StringComparison.Ordinal);
+        Assert.Contains("    fSpline.PutProp([\"PoleA\", \"\", \"PoleB\"], 0, 0, 0, 0, 0, 0, 0, 0, 5);", csx, System.StringComparison.Ordinal);
+        Assert.Contains("    fSpline.PutProp(\"Finite\", [\"Marker\"], 0, 0, 0, 0, 0, 0, 0, 0, 5, 3);", csx, System.StringComparison.Ordinal);
+        Assert.Contains("    fJunction.Paths[\"NS\"].PutProp([\"Guide\", \"\"], 0, 0, 0, 0, 0, 0, 0, 0, 2);", csx, System.StringComparison.Ordinal);
+
+        (ParsedWorldCsx? parsed, IReadOnlyList<ParseDiagnostic> diag) = WorldCsxSerializer.Parse("World.csx", csx);
+        Assert.Empty(diag);
+        Assert.NotNull(parsed);
+        Assert.Equal(["PoleA", "", "PoleB"], parsed!.Document.Splines[0].Props[0].ModelKeys);
+        Assert.Equal(int.MaxValue, parsed.Document.Splines[0].Props[0].Count);
+        Assert.Equal(3, parsed.Document.Splines[0].Props[1].Count);
+        Assert.Equal(["Guide", ""], parsed.Document.Junctions[0].PathOverrides[0].Props[0].ModelKeys);
+        Assert.Equal(int.MaxValue, parsed.Document.Junctions[0].PathOverrides[0].Props[0].Count);
     }
 }

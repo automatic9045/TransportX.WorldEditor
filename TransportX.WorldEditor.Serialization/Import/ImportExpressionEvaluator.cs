@@ -546,7 +546,7 @@ internal sealed class ImportExpressionEvaluator
             string text = node.Identifier.ValueText;
             if (IdentifierMap.TryGetValue(text, out string? mapped))
             {
-                return SyntaxFactory.IdentifierName(mapped).WithTriviaFrom(node);
+                return SyntaxFactory.ParseExpression(mapped).WithTriviaFrom(node);
             }
 
             if (ScalarSubstitutions is not null && ScalarSubstitutions.TryGetValue(text, out double scalar))

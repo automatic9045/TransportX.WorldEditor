@@ -220,17 +220,8 @@
                                     <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Rule Key (任意)" />
                                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding PropKey.Value, Mode=TwoWay}" Watermark="例: StreetLight" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="ModelKeys (カンマ区切り)" />
-                                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
-                                        <TextBox Text="{Binding PropModelKeysText.Value, Mode=TwoWay}" Watermark="例: LightPole, PoleB" />
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                            <ComboBox Grid.Column="0"
-                                                      HorizontalAlignment="Stretch"
-                                                      ItemsSource="{Binding AvailableModelKeys}"
-                                                      SelectedItem="{Binding ModelKeyToAdd.Value, Mode=TwoWay}" />
-                                            <Button Grid.Column="1" Content="+ モデル追記" Command="{Binding AddModelKeyToPropCommand}" />
-                                        </Grid>
-                                    </StackPanel>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="ModelKeys" />
+                                    <controls:PropModelKeysEditor Grid.Row="1" Grid.Column="1" DataContext="{Binding PropModelsEditor}" />
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="From (m)" />
                                     <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding PropFrom.Value, Mode=TwoWay}" Minimum="0" Increment="1" FormatString="0.###" ShowButtonSpinner="False" />

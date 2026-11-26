@@ -368,11 +368,7 @@
                   </ListBox.ItemTemplate>
                 </ListBox>
                 <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedPathProp.Value}">
-                  <TextBox Text="{Binding PathPropModelKeysText.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="ModelKeys (カンマ区切り)" />
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableModelKeys}" SelectedItem="{Binding PathPropModelToAdd.Value, Mode=TwoWay}" />
-                    <Button Grid.Column="1" Content="+ 追記" Padding="6,2" Command="{Binding AppendPathPropModelCommand}" />
-                  </Grid>
+                  <controls:PropModelKeysEditor DataContext="{Binding PathPropModelsEditor}" />
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
                     <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailablePathAnchorOptions}" SelectedItem="{Binding PathPropFromAnchor.Value, Mode=TwoWay}" />
                     <NumericUpDown Grid.Column="1" Value="{Binding PathPropFromOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />
@@ -524,11 +520,7 @@
                   </ListBox.ItemTemplate>
                 </ListBox>
                 <StackPanel Spacing="4" IsEnabled="{Binding HasSelectedCurveProp.Value}">
-                  <TextBox Text="{Binding CurvePropModelKeysText.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="ModelKeys (カンマ区切り)" />
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableModelKeys}" SelectedItem="{Binding CurvePropModelToAdd.Value, Mode=TwoWay}" />
-                    <Button Grid.Column="1" Content="+ 追記" Padding="6,2" Command="{Binding AppendCurvePropModelCommand}" />
-                  </Grid>
+                  <controls:PropModelKeysEditor DataContext="{Binding CurvePropModelsEditor}" />
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
                     <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding AvailableCurveAnchorOptions}" SelectedItem="{Binding CurvePropFromAnchor.Value, Mode=TwoWay}" />
                     <NumericUpDown Grid.Column="1" Value="{Binding CurvePropFromOffset.Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" ShowButtonSpinner="False" FormatString="0.###" />

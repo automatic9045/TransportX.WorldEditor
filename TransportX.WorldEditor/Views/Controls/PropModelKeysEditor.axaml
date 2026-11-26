@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Controls"
+             x:Class="TransportX.WorldEditor.Views.Controls.PropModelKeysEditor"
+             x:DataType="vm:PropModelKeysEditorViewModel">
+  <Border Background="#1A1F29"
+          BorderBrush="#323947"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="6">
+    <StackPanel Spacing="5">
+      <TextBlock Text="（モデル未設定）"
+                 FontSize="11.5"
+                 Opacity="0.65"
+                 Margin="2,2"
+                 IsVisible="{Binding !HasSlots.Value}" />
+
+      <ScrollViewer MaxHeight="145"
+                    VerticalScrollBarVisibility="Auto"
+                    IsVisible="{Binding HasSlots.Value}">
+        <ItemsControl ItemsSource="{Binding Slots}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PropModelSlotRow">
+              <Grid ColumnDefinitions="26,*,Auto,Auto,Auto" ColumnSpacing="3" Margin="0,1">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding IndexText}"
+                           FontSize="11"
+                           Opacity="0.75"
+                           VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1"
+                          HorizontalAlignment="Stretch"
+                          MinWidth="0"
+                          FontSize="11.5"
+                          ItemsSource="{Binding Options}"
+                          SelectedItem="{Binding SelectedChoice.Value, Mode=TwoWay}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PropModelKeyChoice">
+                      <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Grid.Column="2"
+                        Content="↑"
+                        Padding="5,2"
+                        FontSize="11"
+                        IsEnabled="{Binding CanMoveUp}"
+                        Command="{Binding MoveUpCommand}" />
+                <Button Grid.Column="3"
+                        Content="↓"
+                        Padding="5,2"
+                        FontSize="11"
+                        IsEnabled="{Binding CanMoveDown}"
+                        Command="{Binding MoveDownCommand}" />
+                <Button Grid.Column="4"
+                        Content="×"
+                        Padding="6,2"
+                        FontSize="11"
+                        Command="{Binding RemoveCommand}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+        <ComboBox Grid.Column="0"
+                  HorizontalAlignment="Stretch"
+                  MinWidth="0"
+                  FontSize="11.5"
+                  ItemsSource="{Binding AvailableModelKeys}"
+                  SelectedItem="{Binding ModelKeyToAdd.Value, Mode=TwoWay}" />
+        <Button Grid.Column="1"
+                Content="+ 追加"
+                Padding="7,2"
+                FontSize="11.5"
+                Command="{Binding AppendSelectedModelCommand}" />
+        <Button Grid.Column="2"
+                Content="+ 空"
+                Padding="7,2"
+                FontSize="11.5"
+                ToolTip.Tip="空スロット (&quot;&quot;) を追加します"
+                Command="{Binding AppendEmptyModelCommand}" />
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

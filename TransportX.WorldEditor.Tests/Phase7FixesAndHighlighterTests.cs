@@ -325,7 +325,9 @@ public sealed class Phase7FixesAndHighlighterTests
 
             string worldCsx = WorldCsxSerializer.Generate(project.Placement, ["Templates/Splines/Spline1.csx"]);
             Assert.Contains("fSpline.SpeedLimit(1, 50);", worldCsx, StringComparison.Ordinal);
-            Assert.Contains("var MainArterialRoad = fSpline.Build();", worldCsx, StringComparison.Ordinal);
+            Assert.Contains("fSpline.Key = \"MainArterialRoad\";", worldCsx, StringComparison.Ordinal);
+            Assert.Contains("    fSpline.Build();", worldCsx, StringComparison.Ordinal);
+            Assert.DoesNotContain("var MainArterialRoad =", worldCsx, StringComparison.Ordinal);
 
             (ParsedWorldCsx? reparsed, IReadOnlyList<Serialization.Diagnostics.ParseDiagnostic> diag) =
                 WorldCsxSerializer.Parse("World.csx", worldCsx);

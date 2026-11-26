@@ -240,12 +240,14 @@ internal static class CurveRuleCsxCodec
 
     public static string FormatCurveProp(string indent, string targetExpr, CurvePropPlacementRule prop)
     {
+        string countArg = prop.Count < int.MaxValue
+            ? $", {prop.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+            : string.Empty;
         return $"{indent}{targetExpr}.PutProp({RoslynCsxHelpers.FormatStringArray(prop.ModelKeys)}, "
             + $"{RoslynCsxHelpers.FormatPoseArgs(prop.Pose)}, "
             + $"{DistanceExprCodec.Format(prop.From)}, "
             + $"{RoslynCsxHelpers.FormatNumber(prop.Span)}, "
-            + $"{RoslynCsxHelpers.FormatNumber(prop.Interval)}, "
-            + $"{(prop.Count == int.MaxValue ? "int.MaxValue" : prop.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))});\n";
+            + $"{RoslynCsxHelpers.FormatNumber(prop.Interval)}{countArg});\n";
     }
 
     public static string FormatCurveExtrusion(string indent, string targetExpr, CurveExtrusionPlacementRule ext)

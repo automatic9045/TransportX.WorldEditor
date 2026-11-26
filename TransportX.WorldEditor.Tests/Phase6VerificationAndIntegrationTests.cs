@@ -820,7 +820,9 @@ public sealed class Phase6VerificationAndIntegrationTests
             Assert.Contains("out var s_1", worldCsxText);
             Assert.Contains("s_fSpline - 5", worldCsxText);
             Assert.Contains("fSpline.Key = \"s_fSpline\";", worldCsxText);
-            Assert.Contains("var s_fSpline_2 = fSpline.Build();", worldCsxText);
+            Assert.Contains("    fSpline.Build();", worldCsxText);
+            Assert.DoesNotContain("var s_fSpline =", worldCsxText);
+            Assert.DoesNotContain("var s_fSpline_2", worldCsxText);
 
             string jCsxText = File.ReadAllText(Path.Combine(project.WorldDirectory, jDoc.RelativePath));
             Assert.Contains("out var s_tJunction", jCsxText);
@@ -1911,18 +1913,25 @@ public sealed class Phase6VerificationAndIntegrationTests
             Assert.Equal("南口広場", ws.GetElementDisplayName(namedProp.Id));
             ws.SelectedSplineId.Value = "spline_002";
 
-            // Invalid Key edits (space / keyword / duplicate) must be rejected & reverted cleanly
-            shell.InspectorTool.SplineKey.Value = "road 1";
-            Assert.Equal("spline_002", shell.InspectorTool.SplineKey.Value);
-            Assert.Equal("spline_002", secondSpline.Key);
+            // Keys aligned with other resources permit digits/hyphens/keywords, while rejecting blanks/control chars/duplicates
+            shell.InspectorTool.SplineKey.Value = "road-1";
+            Assert.Equal("road-1", shell.InspectorTool.SplineKey.Value);
+            Assert.Equal("road-1", secondSpline.Key);
 
             shell.InspectorTool.SplineKey.Value = "class";
-            Assert.Equal("spline_002", shell.InspectorTool.SplineKey.Value);
+            Assert.Equal("class", shell.InspectorTool.SplineKey.Value);
+            Assert.Equal("class", secondSpline.Key);
+
+            shell.InspectorTool.SplineKey.Value = "   ";
+            Assert.Equal("class", shell.InspectorTool.SplineKey.Value);
+
+            shell.InspectorTool.SplineKey.Value = "bad\tkey";
+            Assert.Equal("class", shell.InspectorTool.SplineKey.Value);
 
             shell.InspectorTool.SplineKey.Value = "spline_001";
-            Assert.Equal("spline_002", shell.InspectorTool.SplineKey.Value);
+            Assert.Equal("class", shell.InspectorTool.SplineKey.Value);
 
-            // Japanese Unicode C# identifier Key is accepted and updates references & sidecar atomically
+            // Japanese Unicode Key is accepted and updates references & sidecar atomically
             shell.InspectorTool.SplineKey.Value = "バイパス_1";
             Assert.Equal("バイパス_1", secondSpline.Id);
             Assert.Equal("バイパス_1", secondSpline.Key);
@@ -1945,16 +1954,19 @@ public sealed class Phase6VerificationAndIntegrationTests
             SceneItemEntry junctionEntryFallback = Assert.Single(shell.SceneHierarchyTool.Items, i => i.JunctionId == "交差点_北口");
             Assert.Equal("交差点_北口", junctionEntryFallback.Label);
 
-            // Save & inspect generated World.csx (must use C# variable names & .Key, and store DisplayName via // <display name="..." />)
+            // Save & inspect generated World.csx (must omit per-node vars via fSpline.Build()/Network.Splines[...] and store DisplayName via // <display name="..." />)
             shell.Save(dirtyOnly: false);
             string worldCsxPath = Path.Combine(project.WorldDirectory, project.Placement.RelativePath);
             string worldCsxText = File.ReadAllText(worldCsxPath);
             Assert.Contains("var fSpline =", worldCsxText);
             Assert.Contains("fSpline.Key = \"バイパス_1\";", worldCsxText);
-            Assert.Contains("var バイパス_1 = fSpline.Build();", worldCsxText);
+            Assert.Contains("    fSpline.Build();", worldCsxText);
+            Assert.DoesNotContain("var バイパス_1 =", worldCsxText);
             Assert.Contains("var fJunction =", worldCsxText);
+            Assert.Contains("fJunction = Network.Splines[\"バイパス_1\"].IntoJunction(", worldCsxText);
             Assert.Contains("fJunction.Key = \"交差点_北口\";", worldCsxText);
-            Assert.Contains("var 交差点_北口 = fJunction.Build();", worldCsxText);
+            Assert.Contains("    fJunction.Build();", worldCsxText);
+            Assert.DoesNotContain("var 交差点_北口 =", worldCsxText);
             Assert.Contains("    // <display name=\"駅前通り (南行)\" />", worldCsxText);
             Assert.Contains("    // <display name=\"南口広場\" />", worldCsxText);
             Assert.DoesNotContain("北口交差点", worldCsxText);
@@ -1968,19 +1980,23 @@ public sealed class Phase6VerificationAndIntegrationTests
             IReadOnlyList<ValidationIssue> valIssues = WorldValidator.Validate(project);
             Assert.DoesNotContain(valIssues, static v => v.Severity == ValidationSeverity.Error);
 
-            // Verify Undo reverts Junction DisplayName clear, Junction Key rename, and Spline Key rename in order
+            // Verify Undo reverts Junction DisplayName clear, Junction Key rename, and Spline Key renames in order
             ws.Undo(); // restore junction DisplayName
             Assert.Equal("北口交差点", ws.GetElementDisplayName("交差点_北口"));
             ws.Undo(); // revert junction Key -> junction_001
             Assert.Equal("junction_001", junction.Id);
             Assert.Equal("junction_001", junction.Key);
             ws.Undo(); // revert junction DisplayName
+            ws.Undo(); // revert spline Key -> class
+            ws.Undo(); // revert spline Key -> road-1
             ws.Undo(); // revert spline Key -> spline_002
             Assert.Equal("spline_002", secondSpline.Id);
             Assert.Equal("spline_002", secondSpline.Key);
             Assert.Equal("spline_002", junction.Origin.SourceNodeId);
             Assert.Equal("駅前通り (南行)", ws.GetElementDisplayName("spline_002"));
 
+            ws.Redo();
+            ws.Redo();
             ws.Redo();
             Assert.Equal("バイパス_1", secondSpline.Id);
             Assert.Equal("バイパス_1", junction.Origin.SourceNodeId);

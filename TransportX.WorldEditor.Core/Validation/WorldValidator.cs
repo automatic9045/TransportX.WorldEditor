@@ -627,7 +627,7 @@ public static class WorldValidator
             return;
         }
 
-        if (!CSharpIdentifierUtilities.TryValidateIdentifier(nodeKey, out string reason))
+        if (!CSharpIdentifierUtilities.TryValidateNodeKey(nodeKey, out string reason))
         {
             issues.Add(new ValidationIssue(
                 ValidationSeverity.Error,

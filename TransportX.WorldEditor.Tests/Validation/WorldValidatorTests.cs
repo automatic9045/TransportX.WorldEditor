@@ -267,10 +267,21 @@ public sealed class WorldValidatorTests
         Assert.False(CSharpIdentifierUtilities.IsValidAnchorId("a b"));
         Assert.False(CSharpIdentifierUtilities.IsValidAnchorId("a-b"));
 
+        Assert.True(CSharpIdentifierUtilities.IsValidNodeKey("1本線"));
+        Assert.True(CSharpIdentifierUtilities.IsValidNodeKey("road-1"));
+        Assert.True(CSharpIdentifierUtilities.IsValidNodeKey("class"));
+        Assert.True(CSharpIdentifierUtilities.IsValidNodeKey("本線 1"));
+        Assert.False(CSharpIdentifierUtilities.IsValidNodeKey(""));
+        Assert.False(CSharpIdentifierUtilities.IsValidNodeKey("   "));
+        Assert.False(CSharpIdentifierUtilities.IsValidNodeKey(" leading"));
+        Assert.False(CSharpIdentifierUtilities.IsValidNodeKey("bad\tkey"));
+        Assert.False(CSharpIdentifierUtilities.IsValidNodeKey("bad\nkey"));
+
         WorldProject project = new WorldProject();
         project.Placement.Splines.Add(new SplinePlacementNode { Id = "s1", Key = null });
-        project.Placement.Splines.Add(new SplinePlacementNode { Id = "s2", Key = "invalid space" });
-        project.Placement.Splines.Add(new SplinePlacementNode { Id = "s3", Key = "交差点_A" });
+        project.Placement.Splines.Add(new SplinePlacementNode { Id = "s2", Key = "bad\tkey" });
+        project.Placement.Splines.Add(new SplinePlacementNode { Id = "s3", Key = "1号線-北" });
+        project.Placement.Splines.Add(new SplinePlacementNode { Id = "s4", Key = "交差点_A" });
         project.Placement.Junctions.Add(new JunctionPlacementNode { Id = "j1", Key = "交差点_A", TemplateKey = "MissingTpl" });
 
         IReadOnlyList<ValidationIssue> issues = WorldValidator.Validate(project);

@@ -10,6 +10,7 @@ using TransportX.WorldEditor.Core.Models.Primitives;
 using TransportX.WorldEditor.Core.Models.Templates;
 using TransportX.WorldEditor.Core.Validation;
 using TransportX.WorldEditor.Services;
+using TransportX.WorldEditor.ViewModels.Controls;
 using TransportX.WorldEditor.ViewModels.Dock;
 
 namespace TransportX.WorldEditor.ViewModels.Editors;
@@ -130,6 +131,7 @@ public sealed class SplineTemplateEditorDocumentViewModel : EditorDocumentBase
     public BindableReactiveProperty<string> PropKey { get; }
     public BindableReactiveProperty<string> PropModelKeysText { get; }
     public BindableReactiveProperty<string> ModelKeyToAdd { get; }
+    public PropModelKeysEditorViewModel PropModelsEditor { get; }
     public BindableReactiveProperty<decimal?> PropPosX { get; }
     public BindableReactiveProperty<decimal?> PropPosY { get; }
     public BindableReactiveProperty<decimal?> PropPosZ { get; }
@@ -195,6 +197,7 @@ public sealed class SplineTemplateEditorDocumentViewModel : EditorDocumentBase
         PropKey = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
         PropModelKeysText = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
         ModelKeyToAdd = new BindableReactiveProperty<string>(string.Empty).AddTo(Disposables);
+        PropModelsEditor = new PropModelKeysEditorViewModel(AvailableModelKeys, PropModelKeysText, ModelKeyToAdd).AddTo(Disposables);
         PropPosX = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PropPosY = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
         PropPosZ = new BindableReactiveProperty<decimal?>(0m).AddTo(Disposables);
@@ -542,7 +545,7 @@ public sealed class SplineTemplateEditorDocumentViewModel : EditorDocumentBase
 
             SplineTemplatePropRule m = row.Model;
             PropKey.Value = m.Key ?? string.Empty;
-            PropModelKeysText.Value = string.Join(", ", m.ModelKeys);
+            PropModelKeysText.Value = PropModelKeysTextHelper.Format(m.ModelKeys);
             PropPosX.Value = (decimal)m.Pose.X;
             PropPosY.Value = (decimal)m.Pose.Y;
             PropPosZ.Value = (decimal)m.Pose.Z;
@@ -822,8 +825,7 @@ public sealed class SplineTemplateEditorDocumentViewModel : EditorDocumentBase
             return;
         }
 
-        string current = PropModelKeysText.Value.Trim();
-        PropModelKeysText.Value = string.IsNullOrEmpty(current) ? toAdd : $"{current}, {toAdd}";
+        PropModelKeysText.Value = PropModelKeysTextHelper.Append(PropModelKeysText.Value, toAdd);
     }
 
     private void CommitSelectedProp()
@@ -850,13 +852,7 @@ public sealed class SplineTemplateEditorDocumentViewModel : EditorDocumentBase
             Interval = double.Max(0.0, (double)(PropInterval.Value ?? 0m)),
         };
 
-        string[] parsedKeys = PropModelKeysText.Value.Split(
-            ',',
-            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        foreach (string mk in parsedKeys)
-        {
-            updated.ModelKeys.Add(mk);
-        }
+        updated.ModelKeys.AddRange(PropModelKeysTextHelper.Parse(PropModelKeysText.Value));
 
         IsCommitting = true;
         try

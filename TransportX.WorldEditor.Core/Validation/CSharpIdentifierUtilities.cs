@@ -35,6 +35,38 @@ public static class CSharpIdentifierUtilities
         return TryValidateIdentifier(candidate, out _);
     }
 
+    public static bool IsValidNodeKey(string? candidate)
+    {
+        return TryValidateNodeKey(candidate, out _);
+    }
+
+    public static bool TryValidateNodeKey(string? candidate, out string errorReason)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            errorReason = "Key は必須です。空にはできません。";
+            return false;
+        }
+
+        if (!string.Equals(candidate, candidate.Trim(), StringComparison.Ordinal))
+        {
+            errorReason = "Key の前後に空白を含めることはできません。";
+            return false;
+        }
+
+        foreach (Rune rune in candidate.EnumerateRunes())
+        {
+            if (Rune.IsControl(rune))
+            {
+                errorReason = "Key に制御文字（改行・タブ等）を含めることはできません。";
+                return false;
+            }
+        }
+
+        errorReason = string.Empty;
+        return true;
+    }
+
     public static bool IsValidAnchorId(string? candidate)
     {
         return TryValidateAnchorId(candidate, out _);

@@ -148,6 +148,8 @@ internal sealed class CsxScriptImportEngine
     private readonly HashSet<string> VisitedScripts = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> AbsorbedScriptPaths = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> UsedNodeIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> BuiltSplineIdByKey = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> BuiltJunctionIdByKey = new(StringComparer.Ordinal);
     private readonly HashSet<string> WorldDeclaredAnchors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> WorldAnchorAliases = new(StringComparer.Ordinal);
     private readonly StringBuilder InitUserCodeBuilder = new();
@@ -428,6 +430,8 @@ internal sealed class CsxScriptImportEngine
             return;
         }
 
+        string? statementDisplayName = RoslynCsxHelpers.ExtractStatementDisplayName(statement);
+
         if (statement is BlockSyntax block)
         {
             PushVarScope();
@@ -462,6 +466,7 @@ internal sealed class CsxScriptImportEngine
                         isDeclaration: true,
                         filePath,
                         isInitContext,
+                        statementDisplayName,
                         ref recognizedCount))
                 {
                     handledAnyDecl = true;
@@ -508,6 +513,7 @@ internal sealed class CsxScriptImportEngine
                         isDeclaration: false,
                         filePath,
                         isInitContext,
+                        statementDisplayName,
                         ref recognizedCount))
                 {
                     return;
@@ -520,7 +526,7 @@ internal sealed class CsxScriptImportEngine
             }
 
             if (exprStmt.Expression is InvocationExpressionSyntax inv
-                && TryHandleInvocationStatement(inv, filePath, isInitContext, ref recognizedCount))
+                && TryHandleInvocationStatement(inv, filePath, isInitContext, statementDisplayName, ref recognizedCount))
             {
                 return;
             }
@@ -752,6 +758,7 @@ internal sealed class CsxScriptImportEngine
         bool isDeclaration,
         string filePath,
         bool isInitContext,
+        string? statementDisplayName,
         ref int recognizedCount)
     {
         bool preferExisting = !isDeclaration;
@@ -876,7 +883,7 @@ internal sealed class CsxScriptImportEngine
                 {
                     if (factoryBound is PendingSplineFactoryBinding pendingSpline)
                     {
-                        string builtId = FinalizeBuiltSpline(pendingSpline, buildTargetIdent.Identifier.ValueText);
+                        string builtId = FinalizeBuiltSpline(pendingSpline, buildTargetIdent.Identifier.ValueText, statementDisplayName);
                         SetBinding(targetVarName, new BuiltNodeBinding(isJunction: false, builtId), preferExisting);
                         recognizedCount++;
                         return true;
@@ -884,7 +891,7 @@ internal sealed class CsxScriptImportEngine
 
                     if (factoryBound is PendingJunctionFactoryBinding pendingJunction)
                     {
-                        string builtId = FinalizeBuiltJunction(pendingJunction, buildTargetIdent.Identifier.ValueText);
+                        string builtId = FinalizeBuiltJunction(pendingJunction, buildTargetIdent.Identifier.ValueText, statementDisplayName);
                         SetBinding(targetVarName, new BuiltNodeBinding(isJunction: true, builtId), preferExisting);
                         recognizedCount++;
                         return true;
@@ -894,6 +901,18 @@ internal sealed class CsxScriptImportEngine
                 // 4. Placement factory start: Chunks[cx, cz].BeginSpline/PutJunction, spline.IntoSpline/IntoJunction, junction.IntoSpline/IntoJunction
                 if (TryParsePlacementFactoryStart(rootReceiver, calls, out BoundValue? startedBinding))
                 {
+                    if (!string.IsNullOrWhiteSpace(statementDisplayName))
+                    {
+                        if (startedBinding is PendingSplineFactoryBinding startedSpline)
+                        {
+                            startedSpline.Node.DisplayName = statementDisplayName;
+                        }
+                        else if (startedBinding is PendingJunctionFactoryBinding startedJunction)
+                        {
+                            startedJunction.Node.DisplayName = statementDisplayName;
+                        }
+                    }
+
                     SetBinding(targetVarName, startedBinding!, preferExisting);
                     recognizedCount++;
                     return true;
@@ -921,6 +940,7 @@ internal sealed class CsxScriptImportEngine
         InvocationExpressionSyntax outerInvocation,
         string filePath,
         bool isInitContext,
+        string? statementDisplayName,
         ref int recognizedCount)
     {
         (ExpressionSyntax rootReceiver, List<InvocationExpressionSyntax> calls) = RoslynCsxHelpers.UnwrapFluentChain(outerInvocation);
@@ -953,7 +973,8 @@ internal sealed class CsxScriptImportEngine
                 && TryReadPose3Or6(args, 1, out PoseDegreesModel pose))
             {
                 PropCounter++;
-                TargetProject.Placement.Props.Add(new ChunkPropPlacement($"prop_{PropCounter:D3}", modelKey, chunk, pose));
+                string? propDisplay = string.IsNullOrWhiteSpace(statementDisplayName) ? null : statementDisplayName;
+                TargetProject.Placement.Props.Add(new ChunkPropPlacement($"prop_{PropCounter:D3}", modelKey, chunk, pose, propDisplay));
                 recognizedCount++;
                 return true;
             }
@@ -1066,7 +1087,7 @@ internal sealed class CsxScriptImportEngine
                     && RoslynCsxHelpers.GetInvokedMethodName(calls[0]) == "Build"
                     && calls[0].ArgumentList.Arguments.Count == 0)
                 {
-                    FinalizeBuiltSpline(psf, targetIdent.Identifier.ValueText);
+                    FinalizeBuiltSpline(psf, targetIdent.Identifier.ValueText, statementDisplayName);
                     recognizedCount++;
                     return true;
                 }
@@ -1082,7 +1103,7 @@ internal sealed class CsxScriptImportEngine
                     && RoslynCsxHelpers.GetInvokedMethodName(calls[0]) == "Build"
                     && calls[0].ArgumentList.Arguments.Count == 0)
                 {
-                    FinalizeBuiltJunction(pjf, targetIdent.Identifier.ValueText);
+                    FinalizeBuiltJunction(pjf, targetIdent.Identifier.ValueText, statementDisplayName);
                     recognizedCount++;
                     return true;
                 }
@@ -1613,33 +1634,27 @@ internal sealed class CsxScriptImportEngine
             return true;
         }
 
-        if (method == "IntoSpline" && rootReceiver is IdentifierNameSyntax srcIdent)
+        if (method == "IntoSpline" && TryResolveBuiltNodeReceiver(rootReceiver, out bool srcIsJunction, out string srcNodeId))
         {
-            if (!TryGetBinding(srcIdent.Identifier.ValueText, out BoundValue? boundSrc)
-                || boundSrc is not BuiltNodeBinding builtSrc)
-            {
-                return false;
-            }
-
             SplinePlacementNode? node = null;
-            if (!builtSrc.IsJunction
+            if (!srcIsJunction
                 && args.Count == 1
                 && Evaluator.TryEvalNullableString(args[0].Expression, out string? splineTpl1))
             {
                 node = new SplinePlacementNode
                 {
-                    Origin = SplineOriginModel.FromSpline(builtSrc.NodeId),
+                    Origin = SplineOriginModel.FromSpline(srcNodeId),
                     TemplateKey = splineTpl1,
                 };
             }
-            else if (builtSrc.IsJunction
+            else if (srcIsJunction
                 && args.Count == 2
                 && Evaluator.TryEvalString(args[0].Expression, out string portKey)
                 && Evaluator.TryEvalNullableString(args[1].Expression, out string? splineTpl2))
             {
                 node = new SplinePlacementNode
                 {
-                    Origin = SplineOriginModel.FromJunction(builtSrc.NodeId, portKey),
+                    Origin = SplineOriginModel.FromJunction(srcNodeId, portKey),
                     TemplateKey = splineTpl2,
                 };
             }
@@ -1685,16 +1700,10 @@ internal sealed class CsxScriptImportEngine
             return true;
         }
 
-        if (method == "IntoJunction" && rootReceiver is IdentifierNameSyntax jSrcIdent)
+        if (method == "IntoJunction" && TryResolveBuiltNodeReceiver(rootReceiver, out bool jSrcIsJunction, out string jSrcNodeId))
         {
-            if (!TryGetBinding(jSrcIdent.Identifier.ValueText, out BoundValue? boundSrc)
-                || boundSrc is not BuiltNodeBinding builtSrc)
-            {
-                return false;
-            }
-
             JunctionPlacementNode? node = null;
-            if (!builtSrc.IsJunction
+            if (!jSrcIsJunction
                 && args.Count == 2
                 && Evaluator.TryEvalString(args[0].Expression, out string tplKey1)
                 && Evaluator.TryEvalString(args[1].Expression, out string targetPort1))
@@ -1702,10 +1711,10 @@ internal sealed class CsxScriptImportEngine
                 node = new JunctionPlacementNode
                 {
                     TemplateKey = tplKey1,
-                    Origin = JunctionOriginModel.FromSpline(builtSrc.NodeId, targetPort1),
+                    Origin = JunctionOriginModel.FromSpline(jSrcNodeId, targetPort1),
                 };
             }
-            else if (builtSrc.IsJunction
+            else if (jSrcIsJunction
                 && args.Count == 3
                 && Evaluator.TryEvalString(args[0].Expression, out string srcPort)
                 && Evaluator.TryEvalString(args[1].Expression, out string tplKey2)
@@ -1714,7 +1723,7 @@ internal sealed class CsxScriptImportEngine
                 node = new JunctionPlacementNode
                 {
                     TemplateKey = tplKey2,
-                    Origin = JunctionOriginModel.FromJunction(builtSrc.NodeId, srcPort, targetPort2),
+                    Origin = JunctionOriginModel.FromJunction(jSrcNodeId, srcPort, targetPort2),
                 };
             }
 
@@ -1902,13 +1911,17 @@ internal sealed class CsxScriptImportEngine
         FlushUnrecognized();
     }
 
-    private string FinalizeBuiltSpline(PendingSplineFactoryBinding pending, string factoryVarName)
+    private string FinalizeBuiltSpline(PendingSplineFactoryBinding pending, string factoryVarName, string? buildStatementDisplayName = null)
     {
         SplineCounter++;
         string nodeId = AllocateFinalNodeId(pending.ExplicitKey, $"spline_{SplineCounter:D3}");
         SplinePlacementNode node = pending.Node;
         node.Id = nodeId;
         node.Key = nodeId;
+        if (string.IsNullOrWhiteSpace(node.DisplayName) && !string.IsNullOrWhiteSpace(buildStatementDisplayName))
+        {
+            node.DisplayName = buildStatementDisplayName;
+        }
 
         const string canonicalFactoryVar = "fSpline";
         StringBuilder preBuildSb = new();
@@ -1921,17 +1934,27 @@ internal sealed class CsxScriptImportEngine
         string preBuild = preBuildSb.ToString().TrimEnd('\r', '\n');
         node.PreBuildUserCode = string.IsNullOrWhiteSpace(preBuild) ? null : preBuild;
 
+        BuiltSplineIdByKey[nodeId] = nodeId;
+        if (!string.IsNullOrWhiteSpace(pending.ExplicitKey))
+        {
+            BuiltSplineIdByKey[pending.ExplicitKey.Trim()] = nodeId;
+        }
+
         TargetProject.Placement.Splines.Add(node);
         return nodeId;
     }
 
-    private string FinalizeBuiltJunction(PendingJunctionFactoryBinding pending, string factoryVarName)
+    private string FinalizeBuiltJunction(PendingJunctionFactoryBinding pending, string factoryVarName, string? buildStatementDisplayName = null)
     {
         JunctionCounter++;
         string nodeId = AllocateFinalNodeId(pending.ExplicitKey, $"junction_{JunctionCounter:D3}");
         JunctionPlacementNode node = pending.Node;
         node.Id = nodeId;
         node.Key = nodeId;
+        if (string.IsNullOrWhiteSpace(node.DisplayName) && !string.IsNullOrWhiteSpace(buildStatementDisplayName))
+        {
+            node.DisplayName = buildStatementDisplayName;
+        }
 
         const string canonicalFactoryVar = "fJunction";
         StringBuilder preBuildSb = new();
@@ -1944,6 +1967,12 @@ internal sealed class CsxScriptImportEngine
         string preBuild = preBuildSb.ToString().TrimEnd('\r', '\n');
         node.PreBuildUserCode = string.IsNullOrWhiteSpace(preBuild) ? null : preBuild;
 
+        BuiltJunctionIdByKey[nodeId] = nodeId;
+        if (!string.IsNullOrWhiteSpace(pending.ExplicitKey))
+        {
+            BuiltJunctionIdByKey[pending.ExplicitKey.Trim()] = nodeId;
+        }
+
         TargetProject.Placement.Junctions.Add(node);
         return nodeId;
     }
@@ -1951,13 +1980,24 @@ internal sealed class CsxScriptImportEngine
     private string AllocateFinalNodeId(string? explicitKey, string defaultPrefix)
     {
         string baseId;
-        if (!string.IsNullOrWhiteSpace(explicitKey) && CSharpIdentifierUtilities.IsValidIdentifier(explicitKey.Trim()))
+        string? trimmed = explicitKey?.Trim();
+        if (!string.IsNullOrEmpty(trimmed) && CSharpIdentifierUtilities.TryValidateNodeKey(trimmed, out _))
         {
-            baseId = explicitKey.Trim();
+            baseId = trimmed;
         }
-        else if (!string.IsNullOrWhiteSpace(explicitKey))
+        else if (!string.IsNullOrEmpty(trimmed))
         {
-            baseId = CSharpIdentifierUtilities.SanitizeOrFallback(explicitKey, defaultPrefix);
+            StringBuilder cleaned = new(trimmed.Length);
+            foreach (Rune rune in trimmed.EnumerateRunes())
+            {
+                if (!Rune.IsControl(rune))
+                {
+                    cleaned.Append(rune.ToString());
+                }
+            }
+
+            string candidateClean = cleaned.ToString().Trim();
+            baseId = string.IsNullOrEmpty(candidateClean) ? defaultPrefix : candidateClean;
         }
         else
         {
@@ -2051,7 +2091,9 @@ internal sealed class CsxScriptImportEngine
                         map[kv.Key] = "fJunction";
                         break;
                     case BuiltNodeBinding bn:
-                        map[kv.Key] = bn.NodeId;
+                        map[kv.Key] = bn.IsJunction
+                            ? $"Network.Junctions[{RoslynCsxHelpers.FormatStringLiteral(bn.NodeId)}]"
+                            : $"Network.Splines[{RoslynCsxHelpers.FormatStringLiteral(bn.NodeId)}]";
                         break;
                 }
             }
@@ -2403,19 +2445,58 @@ internal sealed class CsxScriptImportEngine
         return false;
     }
 
+    private bool TryResolveBuiltNodeReceiver(ExpressionSyntax expr, out bool isJunction, out string nodeId)
+    {
+        isJunction = false;
+        nodeId = string.Empty;
+
+        if (expr is IdentifierNameSyntax ident
+            && TryGetBinding(ident.Identifier.ValueText, out BoundValue? bound)
+            && bound is BuiltNodeBinding built)
+        {
+            isJunction = built.IsJunction;
+            nodeId = built.NodeId;
+            return true;
+        }
+
+        if (expr is ElementAccessExpressionSyntax elem
+            && elem.ArgumentList.Arguments.Count == 1
+            && Evaluator.TryEvalString(elem.ArgumentList.Arguments[0].Expression, out string keyStr)
+            && elem.Expression is MemberAccessExpressionSyntax ma
+            && ma.Expression is IdentifierNameSyntax netIdent
+            && netIdent.Identifier.ValueText == "Network")
+        {
+            string collName = ma.Name.Identifier.ValueText;
+            if (collName == "Splines" && BuiltSplineIdByKey.TryGetValue(keyStr, out string? splineId))
+            {
+                isJunction = false;
+                nodeId = splineId;
+                return true;
+            }
+
+            if (collName == "Junctions" && BuiltJunctionIdByKey.TryGetValue(keyStr, out string? junctionId))
+            {
+                isJunction = true;
+                nodeId = junctionId;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool TryParsePortReference(ExpressionSyntax expr, out PortReferenceModel? portRef)
     {
         portRef = null;
-        if (expr is MemberAccessExpressionSyntax ma && ma.Expression is IdentifierNameSyntax sIdent)
+        if (expr is MemberAccessExpressionSyntax ma)
         {
             string portName = ma.Name.Identifier.ValueText;
             if ((portName == "Inlet" || portName == "Outlet")
-                && TryGetBinding(sIdent.Identifier.ValueText, out BoundValue? b)
-                && b is BuiltNodeBinding built
-                && !built.IsJunction)
+                && TryResolveBuiltNodeReceiver(ma.Expression, out bool sIsJunction, out string sNodeId)
+                && !sIsJunction)
             {
                 PortTargetKind kind = portName == "Inlet" ? PortTargetKind.SplineInlet : PortTargetKind.SplineOutlet;
-                portRef = new PortReferenceModel(built.NodeId, kind);
+                portRef = new PortReferenceModel(sNodeId, kind);
                 return true;
             }
         }
@@ -2427,12 +2508,10 @@ internal sealed class CsxScriptImportEngine
             && portsAccess.Name.Identifier.ValueText == "Ports"
             && portsAccess.Expression is MemberAccessExpressionSyntax junctionProp
             && junctionProp.Name.Identifier.ValueText == "Junction"
-            && junctionProp.Expression is IdentifierNameSyntax jIdent
-            && TryGetBinding(jIdent.Identifier.ValueText, out BoundValue? jb)
-            && jb is BuiltNodeBinding builtJ
-            && builtJ.IsJunction)
+            && TryResolveBuiltNodeReceiver(junctionProp.Expression, out bool jIsJunction, out string jNodeId)
+            && jIsJunction)
         {
-            portRef = new PortReferenceModel(builtJ.NodeId, PortTargetKind.JunctionPort, portKey);
+            portRef = new PortReferenceModel(jNodeId, PortTargetKind.JunctionPort, portKey);
             return true;
         }
 
