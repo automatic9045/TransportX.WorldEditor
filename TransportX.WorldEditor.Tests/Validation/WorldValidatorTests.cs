@@ -104,6 +104,27 @@ public sealed class WorldValidatorTests
     }
 
     [Fact]
+    public void ValidateFlagsEmptyAndDuplicateEntriesInCrossSectionLists()
+    {
+        WorldProject project = new();
+        CrossSectionListDocument list1 = new() { RelativePath = "CrossSections.txt" };
+        list1.Entries.Add(new CrossSectionListEntry("Road1L", "CrossSections/Road1L.xml"));
+        list1.Entries.Add(new CrossSectionListEntry("", "CrossSections/EmptyKey.xml"));
+        list1.Entries.Add(new CrossSectionListEntry("NoPath", ""));
+
+        CrossSectionListDocument list2 = new() { RelativePath = "CrossSections_Sub.txt" };
+        list2.Entries.Add(new CrossSectionListEntry("Road1L", "CrossSections/Other.xml"));
+
+        project.CrossSectionLists[list1.RelativePath] = list1;
+        project.CrossSectionLists[list2.RelativePath] = list2;
+
+        IReadOnlyList<ValidationIssue> issues = WorldValidator.Validate(project);
+        Assert.Contains(issues, i => i.Code == "CROSS_SECTION_LIST_EMPTY_KEY");
+        Assert.Contains(issues, i => i.Code == "CROSS_SECTION_LIST_EMPTY_PATH");
+        Assert.Contains(issues, i => i.Code == "CROSS_SECTION_LIST_DUPLICATE_KEY" && i.Message.Contains("Road1L"));
+    }
+
+    [Fact]
     public void ValidateRejectsIntoJunctionAfterConnectBezier()
     {
         WorldProject project = new WorldProject();

@@ -1283,6 +1283,7 @@ public enum AssetBrowserItemKind
     WorldSettings,
     ModelList,
     SoundList,
+    CrossSectionList,
     Environment,
     LaneLayout,
     CrossSection,
@@ -1317,8 +1318,8 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
     public ObservableCollection<AssetBrowserEntry> BasicItems { get; } = new ObservableCollection<AssetBrowserEntry>();
     public ObservableCollection<AssetBrowserEntry> ModelListItems { get; } = new ObservableCollection<AssetBrowserEntry>();
     public ObservableCollection<AssetBrowserEntry> SoundListItems { get; } = new ObservableCollection<AssetBrowserEntry>();
+    public ObservableCollection<AssetBrowserEntry> CrossSectionListItems { get; } = new();
     public ObservableCollection<AssetBrowserEntry> LaneLayoutItems { get; } = new ObservableCollection<AssetBrowserEntry>();
-    public ObservableCollection<AssetBrowserEntry> CrossSectionItems { get; } = new ObservableCollection<AssetBrowserEntry>();
     public ObservableCollection<AssetBrowserEntry> SplineTemplateItems { get; } = new ObservableCollection<AssetBrowserEntry>();
     public ObservableCollection<AssetBrowserEntry> JunctionTemplateItems { get; } = new ObservableCollection<AssetBrowserEntry>();
 
@@ -1337,6 +1338,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
     public ReactiveCommand<Unit> ImportExistingResourceCommand { get; }
     public ReactiveCommand<Unit> CreateModelListCommand { get; }
     public ReactiveCommand<Unit> CreateSoundListCommand { get; }
+    public ReactiveCommand<Unit> CreateCrossSectionListCommand { get; }
     public ReactiveCommand<Unit> CreateLaneLayoutCommand { get; }
     public ReactiveCommand<Unit> CreateCrossSectionCommand { get; }
 
@@ -1383,6 +1385,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
         ImportExistingResourceCommand = new ReactiveCommand<Unit>(u => { _ = ImportForActiveTabAsync(); }).AddTo(Disposables);
         CreateModelListCommand = new ReactiveCommand<Unit>(_ => CreateNewModelList()).AddTo(Disposables);
         CreateSoundListCommand = new ReactiveCommand<Unit>(_ => CreateNewSoundList()).AddTo(Disposables);
+        CreateCrossSectionListCommand = new ReactiveCommand<Unit>(_ => CreateNewCrossSectionList()).AddTo(Disposables);
         CreateLaneLayoutCommand = new ReactiveCommand<Unit>(_ => CreateNewLaneLayout()).AddTo(Disposables);
         CreateCrossSectionCommand = new ReactiveCommand<Unit>(_ => CreateNewCrossSection()).AddTo(Disposables);
 
@@ -1411,6 +1414,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
         {
             AssetBrowserItemKind.ModelList => true,
             AssetBrowserItemKind.SoundList => true,
+            AssetBrowserItemKind.CrossSectionList => true,
             AssetBrowserItemKind.LaneLayout => true,
             AssetBrowserItemKind.CrossSection => true,
             AssetBrowserItemKind.SplineTemplate => true,
@@ -1431,6 +1435,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
         {
             AssetBrowserItemKind.ModelList => Workspace.RemoveModelList(entry.RelativePath),
             AssetBrowserItemKind.SoundList => Workspace.RemoveSoundList(entry.RelativePath),
+            AssetBrowserItemKind.CrossSectionList => Workspace.RemoveCrossSectionList(entry.RelativePath),
             AssetBrowserItemKind.LaneLayout => Workspace.RemoveLaneLayout(entry.Key),
             AssetBrowserItemKind.CrossSection => Workspace.RemoveCrossSection(entry.Key),
             AssetBrowserItemKind.SplineTemplate => Workspace.RemoveSplineTemplate(entry.Key),
@@ -1486,8 +1491,8 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
             case 4:
                 CanCreateForActiveTab.Value = true;
                 CanImportForActiveTab.Value = true;
-                CreateButtonLabel.Value = "+ 断面形状";
-                NewKeyWatermark.Value = "新規/読込キー (例: CurbRoad)";
+                CreateButtonLabel.Value = "+ 断面リスト";
+                NewKeyWatermark.Value = "新規ファイル名 (例: CrossSections_Sub.txt)";
                 break;
 
             case 5:
@@ -1523,9 +1528,6 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
 
         string initialDir = SelectedTabIndex.Value switch
         {
-            4 => Directory.Exists(Path.Combine(project.WorldDirectory, "CrossSections"))
-                ? Path.Combine(project.WorldDirectory, "CrossSections")
-                : project.WorldDirectory,
             5 => Directory.Exists(Path.Combine(project.WorldDirectory, "Templates", "Splines"))
                 ? Path.Combine(project.WorldDirectory, "Templates", "Splines")
                 : project.WorldDirectory,
@@ -1541,7 +1543,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
             1 => ("既存のモデルリスト (.txt) を選択", "Model List", new[] { "*.txt" }),
             2 => ("既存のサウンドリスト (.txt) を選択", "Sound List", new[] { "*.txt" }),
             3 => ("既存の進路レイアウト XML を選択", "LaneLayout XML", new[] { "*.xml" }),
-            4 => ("既存の断面 XML を選択", "CrossSection XML", new[] { "*.xml" }),
+            4 => ("既存の断面リスト (.txt) を選択", "CrossSection List", new[] { "*.txt" }),
             5 => ("既存のスプラインテンプレート CSX を選択", "SplineTemplate CSX", new[] { "*.csx" }),
             6 => ("既存のジャンクションテンプレート CSX を選択", "JunctionTemplate CSX", new[] { "*.csx" }),
             _ => (string.Empty, string.Empty, Array.Empty<string>()),
@@ -1634,9 +1636,8 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
                     : null;
 
             case 4:
-                return Workspace.ImportExistingCrossSection(filePath, desiredKey, out string? csKey, out string? csRel)
-                    && csKey is not null && csRel is not null
-                    ? new AssetBrowserEntry(AssetBrowserItemKind.CrossSection, csKey, csRel, false)
+                return Workspace.ImportExistingCrossSectionList(filePath, out string? csListRel) && csListRel is not null
+                    ? new AssetBrowserEntry(AssetBrowserItemKind.CrossSectionList, Path.GetFileName(csListRel), csListRel, false)
                     : null;
 
             case 5:
@@ -1670,7 +1671,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
                 CreateNewLaneLayout();
                 break;
             case 4:
-                CreateNewCrossSection();
+                CreateNewCrossSectionList();
                 break;
             case 5:
                 CreateNewSplineTemplate();
@@ -1710,6 +1711,22 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
         {
             NewResourceKey.Value = string.Empty;
             OpenCallback(new AssetBrowserEntry(AssetBrowserItemKind.SoundList, Path.GetFileName(relPath), relPath, false));
+        }
+    }
+
+    private void CreateNewCrossSectionList()
+    {
+        WorldProject? project = Workspace.CurrentProject.Value;
+        if (project is null)
+        {
+            return;
+        }
+
+        string relPath = BuildUniqueListPath(NewResourceKey.Value, "CrossSections", key => project.CrossSectionLists.ContainsKey(key));
+        if (Workspace.AddNewCrossSectionList(relPath))
+        {
+            NewResourceKey.Value = string.Empty;
+            OpenCallback(new AssetBrowserEntry(AssetBrowserItemKind.CrossSectionList, Path.GetFileName(relPath), relPath, false));
         }
     }
 
@@ -1834,8 +1851,8 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
         BasicItems.Clear();
         ModelListItems.Clear();
         SoundListItems.Clear();
+        CrossSectionListItems.Clear();
         LaneLayoutItems.Clear();
-        CrossSectionItems.Clear();
         SplineTemplateItems.Clear();
         JunctionTemplateItems.Clear();
 
@@ -1866,6 +1883,11 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
             AddCategorizedEntry(new AssetBrowserEntry(AssetBrowserItemKind.SoundList, s.BundleKey ?? Path.GetFileName(s.RelativePath), s.RelativePath, false));
         }
 
+        foreach (CrossSectionListDocument csList in project.CrossSectionLists.Values.OrderBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase))
+        {
+            AddCategorizedEntry(new AssetBrowserEntry(AssetBrowserItemKind.CrossSectionList, Path.GetFileName(csList.RelativePath), csList.RelativePath, false));
+        }
+
         foreach (EnvironmentProfileDocument env in project.Environments.Values.OrderBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase))
         {
             AddCategorizedEntry(new AssetBrowserEntry(AssetBrowserItemKind.Environment, Path.GetFileNameWithoutExtension(env.RelativePath), env.RelativePath, false));
@@ -1874,11 +1896,6 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
         foreach (LaneLayoutDocument layout in project.LaneLayouts.Values.OrderBy(l => l.Key, StringComparer.Ordinal))
         {
             AddCategorizedEntry(new AssetBrowserEntry(AssetBrowserItemKind.LaneLayout, layout.Key, layout.RelativePath, false));
-        }
-
-        foreach (CrossSectionDocument cs in project.CrossSections.Values.OrderBy(c => c.Key, StringComparer.Ordinal))
-        {
-            AddCategorizedEntry(new AssetBrowserEntry(AssetBrowserItemKind.CrossSection, cs.Key, cs.RelativePath, false));
         }
 
         foreach (SplineTemplateDocument st in project.SplineTemplates.Values.OrderBy(t => t.Key, StringComparer.Ordinal))
@@ -1907,7 +1924,7 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
             1 => ModelListItems,
             2 => SoundListItems,
             3 => LaneLayoutItems,
-            4 => CrossSectionItems,
+            4 => CrossSectionListItems,
             5 => SplineTemplateItems,
             6 => JunctionTemplateItems,
             _ => BasicItems,
@@ -1935,11 +1952,11 @@ public sealed class AssetBrowserToolViewModel : Tool, IDisposable
             case AssetBrowserItemKind.SoundList:
                 SoundListItems.Add(entry);
                 break;
+            case AssetBrowserItemKind.CrossSectionList:
+                CrossSectionListItems.Add(entry);
+                break;
             case AssetBrowserItemKind.LaneLayout:
                 LaneLayoutItems.Add(entry);
-                break;
-            case AssetBrowserItemKind.CrossSection:
-                CrossSectionItems.Add(entry);
                 break;
             case AssetBrowserItemKind.SplineTemplate:
                 SplineTemplateItems.Add(entry);

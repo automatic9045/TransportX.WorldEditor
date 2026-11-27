@@ -11,6 +11,7 @@ using TransportX.Dependency;
 using TransportX.Physics;
 using TransportX.Rendering.Backend;
 using TransportX.WorldEditor.Core.Models;
+using TransportX.WorldEditor.Core.Models.Assets;
 using TransportX.WorldEditor.Core.Validation;
 using TransportX.WorldEditor.Rendering.Interaction;
 using TransportX.WorldEditor.Rendering.Platform;
@@ -331,7 +332,9 @@ public sealed class WorldProjectImporterTests
             Assert.Contains(result.Project!.Init.LaneLayouts, l => l.Key == "33_42_L_1" && l.RelativePath == "LaneLayouts/33_42/L_1.xml");
             Assert.Contains(result.Project.Init.ModelLists, m => m.BundleKey is null && m.RelativePath == "Models.txt");
             Assert.Contains(result.Project.Init.ModelLists, m => m.BundleKey == "Buildings" && m.RelativePath == "Models/Buildings/Models.txt");
-            Assert.Contains(result.Project.Init.CrossSections, c => c.Key == "SubRoad" && c.RelativePath == "CrossSections/Sub/Road.xml");
+            Assert.Contains("CrossSections.txt", result.Project.Init.CrossSectionLists);
+            Assert.True(result.Project.CrossSectionLists.TryGetValue("CrossSections.txt", out CrossSectionListDocument? generatedCsList));
+            Assert.Contains(generatedCsList!.Entries, e => e.Key == "SubRoad" && e.RelativePath == "CrossSections/Sub/Road.xml");
             Assert.True(result.Project.LaneLayouts.ContainsKey("33_42_L_1"));
             Assert.True(result.Project.ModelLists.ContainsKey("Models/Buildings/Models.txt"));
             Assert.True(result.Project.CrossSections.ContainsKey("SubRoad"));
@@ -342,6 +345,61 @@ public sealed class WorldProjectImporterTests
             Assert.True(reloaded.Project.LaneLayouts.ContainsKey("33_42_L_1"));
             Assert.True(reloaded.Project.ModelLists.ContainsKey("Models/Buildings/Models.txt"));
             Assert.True(reloaded.Project.CrossSections.ContainsKey("SubRoad"));
+        }
+        finally
+        {
+            DeleteTempDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void ImportWorld_PreservesExistingCrossSectionsLoadListAndResolvesListRelativePaths()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            string srcRoot = Path.Combine(tempRoot, "Source");
+            string srcWorldDir = Path.Combine(srcRoot, "ListAuthor", "ListWorld");
+            Directory.CreateDirectory(Path.Combine(srcWorldDir, "CrossSections", "Sub"));
+
+            string srcXml = Path.Combine(srcRoot, "ListAuthor.ListWorld.xml");
+            File.WriteAllText(srcXml,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<WorldInfo>\n" +
+                "  <Title>ListWorld</Title>\n" +
+                "  <Author>ListAuthor</Author>\n" +
+                "  <Path>$(bin)TransportX.Scripting.dll</Path>\n" +
+                "  <Args><Arg>ListAuthor\\ListWorld\\World.csx</Arg></Args>\n" +
+                "</WorldInfo>\n");
+
+            File.WriteAllText(Path.Combine(srcWorldDir, "CrossSections", "List.txt"), "SubRoad\tSub/Road.xml\n");
+            File.WriteAllText(Path.Combine(srcWorldDir, "CrossSections", "Sub", "Road.xml"),
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<CrossSection><Vertices /><Materials /><ColliderMaterials /><Surfaces /></CrossSection>\n");
+            File.WriteAllText(Path.Combine(srcWorldDir, "CrossSections", "Load.csx"),
+                "CrossSections.LoadList(\"List.txt\");\n");
+            File.WriteAllText(Path.Combine(srcWorldDir, "World.csx"),
+                "#load \"CrossSections/Load.csx\"\n" +
+                "Camera.Locate(0, 0, 10, 5, 20, 0, 0, 0);\n");
+
+            string destRoot = Path.Combine(tempRoot, "Dest");
+            WorldImportResult result = WorldProjectImporter.Import(new WorldImportOptions(
+                srcXml,
+                destRoot,
+                "OutAuthor",
+                "ListImported",
+                "List Imported",
+                "OK"));
+
+            Assert.True(result.Succeeded, string.Join(" | ", result.Diagnostics.Select(static d => d.Message)));
+            Assert.DoesNotContain(result.Diagnostics, static d => d.Severity == DiagnosticSeverity.Error);
+            Assert.Contains("CrossSections/List.txt", result.Project!.Init.CrossSectionLists);
+            Assert.True(result.Project.CrossSectionLists.ContainsKey("CrossSections/List.txt"));
+            Assert.True(result.Project.CrossSections.ContainsKey("SubRoad"));
+
+            WorldProjectLoadResult reloaded = WorldProjectStorage.Load(result.DestinationWorldInfoPath);
+            Assert.DoesNotContain(reloaded.Diagnostics, static d => d.Severity == DiagnosticSeverity.Error);
+            Assert.True(reloaded.Project.CrossSections.ContainsKey("SubRoad"));
+            Assert.Equal("CrossSections/Sub/Road.xml", reloaded.Project.CrossSections["SubRoad"].RelativePath);
         }
         finally
         {

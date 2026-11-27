@@ -9,7 +9,7 @@ namespace TransportX.WorldEditor.Core.Models.Init;
 public sealed record AssetListLoadReference(string? BundleKey, string RelativePath);
 
 /// <summary>
-/// Represents a keyed resource load entry such as <c>CrossSections.Load(key, path)</c> or <c>Network.LaneLayouts.Load(key, path)</c>.
+/// Represents a keyed resource load entry such as <c>Network.LaneLayouts.Load(key, path)</c>.
 /// </summary>
 public sealed record ResourceLoadReference(string Key, string RelativePath);
 
@@ -19,10 +19,10 @@ public sealed record ResourceLoadReference(string Key, string RelativePath);
 public sealed class InitDocument
 {
     public string RelativePath { get; set; } = "Init.csx";
-    public List<AssetListLoadReference> ModelLists { get; } = new List<AssetListLoadReference>();
-    public List<AssetListLoadReference> SoundLists { get; } = new List<AssetListLoadReference>();
-    public List<ResourceLoadReference> CrossSections { get; } = new List<ResourceLoadReference>();
-    public LaneTrafficConfigModel LaneTraffic { get; } = new LaneTrafficConfigModel();
-    public List<ResourceLoadReference> LaneLayouts { get; } = new List<ResourceLoadReference>();
+    public List<AssetListLoadReference> ModelLists { get; } = new();
+    public List<AssetListLoadReference> SoundLists { get; } = new();
+    public List<string> CrossSectionLists { get; } = new();
+    public LaneTrafficConfigModel LaneTraffic { get; } = new();
+    public List<ResourceLoadReference> LaneLayouts { get; } = new();
     public string? UserCode { get; set; }
 }

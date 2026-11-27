@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using TransportX.WorldEditor.Core.Models;
+using TransportX.WorldEditor.Core.Models.Assets;
 using TransportX.WorldEditor.Core.Models.Init;
 using TransportX.WorldEditor.Core.Models.Network;
 using TransportX.WorldEditor.Core.Models.Placement;
@@ -161,6 +162,7 @@ internal sealed class CsxScriptImportEngine
     private int SplineCounter;
     private int JunctionCounter;
     private int PreservedUserCodeCount;
+    private readonly List<CrossSectionListEntry> LegacyLoadedCrossSectionsList = new();
 
     public CsxScriptImportEngine(string sourceWorldDirectory, WorldProject targetProject, List<ParseDiagnostic> diagnostics)
     {
@@ -171,6 +173,7 @@ internal sealed class CsxScriptImportEngine
     }
 
     public IReadOnlySet<string> AbsorbedScripts => AbsorbedScriptPaths;
+    public IReadOnlyList<CrossSectionListEntry> LegacyLoadedCrossSections => LegacyLoadedCrossSectionsList;
     public int PreservedUserCodeStatementCount => PreservedUserCodeCount;
 
     public void Execute(string entryScriptFullPath)
@@ -1160,11 +1163,18 @@ internal sealed class CsxScriptImportEngine
             return true;
         }
 
+        if (receiverPath == "CrossSections" && methodName == "LoadList" && args.Count == 1
+            && Evaluator.TryEvalString(args[0].Expression, out string csListPath))
+        {
+            TargetProject.Init.CrossSectionLists.Add(ResolveScriptAssetPath(csListPath, filePath));
+            return true;
+        }
+
         if (receiverPath == "CrossSections" && methodName == "Load" && args.Count == 2
             && Evaluator.TryEvalString(args[0].Expression, out string csKey)
             && Evaluator.TryEvalString(args[1].Expression, out string csPath))
         {
-            TargetProject.Init.CrossSections.Add(new ResourceLoadReference(csKey, ResolveScriptAssetPath(csPath, filePath)));
+            LegacyLoadedCrossSectionsList.Add(new CrossSectionListEntry(csKey, ResolveScriptAssetPath(csPath, filePath)));
             return true;
         }
 

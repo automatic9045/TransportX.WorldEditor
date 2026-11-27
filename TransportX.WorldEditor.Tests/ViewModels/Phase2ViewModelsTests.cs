@@ -229,12 +229,9 @@ public sealed class Phase2ViewModelsTests
             shell.AssetBrowserTool.CreateCrossSectionCommand.Execute(Unit.Default);
             Assert.True(project.CrossSections.ContainsKey("StandardRoad"));
 
-            AssetBrowserEntry? csEntry = shell.AssetBrowserTool.Items.FirstOrDefault(
-                i => i.Kind == AssetBrowserItemKind.CrossSection && i.Key == "StandardRoad");
-            Assert.NotNull(csEntry);
-
-            CrossSectionEditorDocumentViewModel csVm = Assert.IsType<CrossSectionEditorDocumentViewModel>(shell.OpenAsset(csEntry!));
-            Assert.False(csVm.HasColliderConflictError.Value);
+            CrossSectionEditorDocumentViewModel? csVm = shell.OpenCrossSectionEditor("StandardRoad");
+            Assert.NotNull(csVm);
+            Assert.False(csVm!.HasColliderConflictError.Value);
 
             // Drag vertex & normal on canvas
             csVm.SelectVertexIndex(0);
@@ -323,7 +320,6 @@ public sealed class Phase2ViewModelsTests
                     Assert.True(sample.IsProtected("World.csx"));
                     Assert.True(sample.IsProtected("Init.csx"));
                     Assert.NotEmpty(sample.ModelLists);
-                    Assert.NotEmpty(sample.CrossSections);
                     Assert.NotEmpty(sample.LaneLayouts);
                     Assert.NotEmpty(sample.Environments);
                     Assert.NotEmpty(sample.Placement.Props);
@@ -364,16 +360,19 @@ public sealed class Phase2ViewModelsTests
 
             ModelListEditorDocumentViewModel? models = shell.OpenDefaultModelList();
             SoundListEditorDocumentViewModel? sounds = shell.OpenDefaultSoundList();
+            CrossSectionListEditorDocumentViewModel? csList = shell.OpenDefaultCrossSectionList();
             EnvironmentEditorDocumentViewModel? env = shell.OpenDefaultEnvironment();
             WorldSettingsDocumentViewModel? settings = shell.OpenWorldSettings();
 
             Assert.NotNull(models);
             Assert.NotNull(sounds);
+            Assert.NotNull(csList);
             Assert.NotNull(env);
             Assert.NotNull(settings);
 
             Assert.True(locator.Match(models));
             Assert.True(locator.Match(sounds));
+            Assert.True(locator.Match(csList));
             Assert.True(locator.Match(env));
             Assert.True(locator.Match(settings));
             Assert.False(locator.Match("unexpected"));
@@ -397,8 +396,8 @@ public sealed class Phase2ViewModelsTests
             Assert.Equal(2, browser.BasicItems.Count); // WorldSettings + Environment
             Assert.Single(browser.ModelListItems);
             Assert.Single(browser.SoundListItems);
+            Assert.Single(browser.CrossSectionListItems);
             Assert.Single(browser.LaneLayoutItems);
-            Assert.Single(browser.CrossSectionItems);
 
             // Creating an extra ModelList via Tab 1 (モデル)
             browser.SelectedTabIndex.Value = 1;
@@ -520,10 +519,9 @@ public sealed class Phase2ViewModelsTests
             Assert.Same(soundRow, sounds.SelectedRow.Value);
             Assert.Equal("Horn A", project.SoundLists["Sounds.txt"].Entries[0].Key);
 
-            AssetBrowserEntry csEntry = Assert.Single(shell.AssetBrowserTool.CrossSectionItems);
-            CrossSectionEditorDocumentViewModel csVm = Assert.IsType<CrossSectionEditorDocumentViewModel>(
-                shell.OpenAsset(csEntry));
-            CrossSectionVertexRow? vertexRow = csVm.SelectedVertex.Value;
+            CrossSectionEditorDocumentViewModel? csVm = shell.OpenCrossSectionEditor("Road1L");
+            Assert.NotNull(csVm);
+            CrossSectionVertexRow? vertexRow = csVm!.SelectedVertex.Value;
             Assert.NotNull(vertexRow);
 
             List<bool> csVertexSelLog = new();
@@ -532,7 +530,7 @@ public sealed class Phase2ViewModelsTests
             csVm.VertexKey.Value = "v curb";
             Assert.DoesNotContain(false, csVertexSelLog);
             Assert.Same(vertexRow, csVm.SelectedVertex.Value);
-            Assert.Equal("v curb", project.CrossSections[csEntry.Key].Vertices[0].Key);
+            Assert.Equal("v curb", project.CrossSections["Road1L"].Vertices[0].Key);
 
             // Metallic & Roughness numeric inputs stay bidirectionally synced with sliders + Undo/Redo
             CrossSectionMaterialModel? mat = csVm.SelectedMaterial.Value;
@@ -619,9 +617,8 @@ public sealed class Phase2ViewModelsTests
                 Assert.Equal("AB 1", project.ModelLists["Models.txt"].Entries[0].Key);
 
                 // Verify CrossSectionEditorView TabItem FontSize & compact NumericUpDown spinner RepeatButton width
-                AssetBrowserEntry csEntry = Assert.Single(shell.AssetBrowserTool.CrossSectionItems);
-                CrossSectionEditorDocumentViewModel csVm = Assert.IsType<CrossSectionEditorDocumentViewModel>(
-                    shell.OpenAsset(csEntry));
+                CrossSectionEditorDocumentViewModel? csVm = shell.OpenCrossSectionEditor("Road1L");
+                Assert.NotNull(csVm);
                 CrossSectionEditorView csView = new()
                 {
                     DataContext = csVm,
@@ -845,10 +842,9 @@ public sealed class Phase2ViewModelsTests
             Assert.Equal(s1, project.SoundLists["Sounds.txt"].Entries[0].Key);
             Assert.Equal(s2, project.SoundLists["Sounds.txt"].Entries[1].Key);
 
-            AssetBrowserEntry csEntry = Assert.Single(shell.AssetBrowserTool.CrossSectionItems);
-            CrossSectionEditorDocumentViewModel csVm = Assert.IsType<CrossSectionEditorDocumentViewModel>(
-                shell.OpenAsset(csEntry));
-            CrossSectionDocument csDoc = project.CrossSections[csEntry.Key];
+            CrossSectionEditorDocumentViewModel? csVm = shell.OpenCrossSectionEditor("Road1L");
+            Assert.NotNull(csVm);
+            CrossSectionDocument csDoc = project.CrossSections["Road1L"];
             string v0 = csDoc.Vertices[0].Key;
             string v1 = csDoc.Vertices[1].Key;
 
@@ -879,6 +875,9 @@ public sealed class Phase2ViewModelsTests
 
             string extSounds = Path.Combine(externalDir, "Sounds_Custom.txt");
             File.WriteAllText(extSounds, "DoorBell\tSounds/Bell.wav\n");
+
+            string extCrossSectionsList = Path.Combine(externalDir, "CrossSections_Custom.txt");
+            File.WriteAllText(extCrossSectionsList, "CustomListRoad\tCrossSections/CustomListRoad.xml\n");
 
             string extLayout = Path.Combine(externalDir, "CustomArterial.xml");
             File.WriteAllText(extLayout, """
@@ -983,7 +982,13 @@ public sealed class Phase2ViewModelsTests
             Assert.True(browser.ImportExistingFromFile(3, extLayout));
             Assert.True(project.LaneLayouts.ContainsKey("CustomArterial"));
 
-            Assert.True(browser.ImportExistingFromFile(4, extCross));
+            Assert.True(browser.ImportExistingFromFile(4, extCrossSectionsList));
+            Assert.True(project.CrossSectionLists.ContainsKey("CrossSections_Custom.txt"));
+            Assert.False(browser.ImportExistingFromFile(4, Path.Combine(project.WorldDirectory, "CrossSections_Custom.txt")));
+
+            CrossSectionListEditorDocumentViewModel? csListDoc = shell.OpenDefaultCrossSectionList();
+            Assert.NotNull(csListDoc);
+            Assert.Equal(1, csListDoc!.ImportXmlFiles(new string[] { extCross }));
             Assert.True(project.CrossSections.ContainsKey("CurbSidewalk"));
 
             Assert.True(browser.ImportExistingFromFile(5, extSpline));
@@ -998,24 +1003,23 @@ public sealed class Phase2ViewModelsTests
             shell.RedoCommand.Execute(Unit.Default);
             Assert.Equal("Environment_Night.xml", project.Placement.EnvironmentPath);
 
-            // Multi-file import via ImportExistingFromFiles derives distinct keys even if NewResourceKey was populated
+            // Multi-file import via ImportXmlFiles derives distinct keys
             string extCrossA = Path.Combine(externalDir, "BatchCurbA.xml");
             string extCrossB = Path.Combine(externalDir, "BatchCurbB.xml");
             string csXmlTemplate = File.ReadAllText(extCross);
             File.WriteAllText(extCrossA, csXmlTemplate);
             File.WriteAllText(extCrossB, csXmlTemplate);
-            browser.NewResourceKey.Value = "ShouldBeIgnoredForMulti";
-            int batchImported = browser.ImportExistingFromFiles(4, new string[] { extCrossA, extCrossB });
+            int batchImported = csListDoc.ImportXmlFiles(new string[] { extCrossA, extCrossB });
             Assert.Equal(2, batchImported);
             Assert.True(project.CrossSections.ContainsKey("BatchCurbA"));
             Assert.True(project.CrossSections.ContainsKey("BatchCurbB"));
-            Assert.Equal(string.Empty, browser.NewResourceKey.Value);
 
             // Save & Reload round-trips imported assets
             shell.SaveAllCommand.Execute(Unit.Default);
             WorldProjectLoadResult reloaded = WorldProjectStorage.Load(project.WorldInfoFilePath);
             Assert.True(reloaded.Project.ModelLists.ContainsKey("Models_Custom.txt"));
             Assert.True(reloaded.Project.SoundLists.ContainsKey("Sounds_Custom.txt"));
+            Assert.True(reloaded.Project.CrossSectionLists.ContainsKey("CrossSections_Custom.txt"));
             Assert.True(reloaded.Project.LaneLayouts.ContainsKey("CustomArterial"));
             Assert.True(reloaded.Project.CrossSections.ContainsKey("CurbSidewalk"));
             Assert.True(reloaded.Project.CrossSections.ContainsKey("BatchCurbA"));
@@ -1043,21 +1047,21 @@ public sealed class Phase2ViewModelsTests
             WorldSettingsDocumentViewModel? settingsDoc = shell.OpenWorldSettings();
             ModelListEditorDocumentViewModel? modelsDoc = shell.OpenDefaultModelList();
             SoundListEditorDocumentViewModel? soundsDoc = shell.OpenDefaultSoundList();
+            CrossSectionListEditorDocumentViewModel? csListDoc = shell.OpenDefaultCrossSectionList();
             EnvironmentEditorDocumentViewModel? envDoc = shell.OpenDefaultEnvironment();
 
             AssetBrowserEntry? laneEntry = shell.AssetBrowserTool.LaneLayoutItems.FirstOrDefault();
-            AssetBrowserEntry? csEntry = shell.AssetBrowserTool.CrossSectionItems.FirstOrDefault();
             AssetBrowserEntry? tplEntry = shell.AssetBrowserTool.SplineTemplateItems.FirstOrDefault();
             Assert.NotNull(settingsDoc);
             Assert.NotNull(modelsDoc);
             Assert.NotNull(soundsDoc);
+            Assert.NotNull(csListDoc);
             Assert.NotNull(envDoc);
             Assert.NotNull(laneEntry);
-            Assert.NotNull(csEntry);
             Assert.NotNull(tplEntry);
 
             LaneLayoutEditorDocumentViewModel? laneDoc = shell.OpenAsset(laneEntry) as LaneLayoutEditorDocumentViewModel;
-            CrossSectionEditorDocumentViewModel? csDoc = shell.OpenAsset(csEntry) as CrossSectionEditorDocumentViewModel;
+            CrossSectionEditorDocumentViewModel? csDoc = shell.OpenCrossSectionEditor("Road1L");
             SplineTemplateEditorDocumentViewModel? tplDoc = shell.OpenAsset(tplEntry) as SplineTemplateEditorDocumentViewModel;
             Assert.NotNull(laneDoc);
             Assert.NotNull(csDoc);
@@ -1067,6 +1071,7 @@ public sealed class Phase2ViewModelsTests
             Assert.DoesNotContain("*", settingsDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", modelsDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", soundsDoc.Title, StringComparison.Ordinal);
+            Assert.DoesNotContain("*", csListDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", envDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", laneDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", csDoc.Title, StringComparison.Ordinal);
@@ -1075,6 +1080,7 @@ public sealed class Phase2ViewModelsTests
             settingsDoc.WorldTitle.Value = "Dirty World Title";
             modelsDoc.AddEntryCommand.Execute(Unit.Default);
             soundsDoc.AddCommand.Execute(Unit.Default);
+            csListDoc.AddEntryCommand.Execute(Unit.Default);
             envDoc.ExposureKey.Value = 0.25m;
             laneDoc.AddLaneCommand.Execute(Unit.Default);
             csDoc.AddVertexCommand.Execute(Unit.Default);
@@ -1085,6 +1091,7 @@ public sealed class Phase2ViewModelsTests
             Assert.EndsWith(" *", settingsDoc.Title, StringComparison.Ordinal);
             Assert.EndsWith(" *", modelsDoc.Title, StringComparison.Ordinal);
             Assert.EndsWith(" *", soundsDoc.Title, StringComparison.Ordinal);
+            Assert.EndsWith(" *", csListDoc.Title, StringComparison.Ordinal);
             Assert.EndsWith(" *", envDoc.Title, StringComparison.Ordinal);
             Assert.EndsWith(" *", laneDoc.Title, StringComparison.Ordinal);
             Assert.EndsWith(" *", csDoc.Title, StringComparison.Ordinal);
@@ -1096,10 +1103,166 @@ public sealed class Phase2ViewModelsTests
             Assert.DoesNotContain("*", settingsDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", modelsDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", soundsDoc.Title, StringComparison.Ordinal);
+            Assert.DoesNotContain("*", csListDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", envDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", laneDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", csDoc.Title, StringComparison.Ordinal);
             Assert.DoesNotContain("*", tplDoc.Title, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTempDirectory(tempDir);
+        }
+    }
+
+    [Fact]
+    public void CrossSectionListEditor_CrudDuplicateMoveOpenAndUndoRedo_SyncProjectAndTsv()
+    {
+        string tempDir = CreateTempDirectory();
+        try
+        {
+            using MainWindowViewModel shell = new();
+            WorldProject project = shell.CreateAndActivateWorld(tempDir, "Author", "CsListWorld", "CsListWorld", "");
+
+            AssetBrowserEntry csListAsset = Assert.Single(shell.AssetBrowserTool.CrossSectionListItems);
+            CrossSectionListEditorDocumentViewModel csListVm = Assert.IsType<CrossSectionListEditorDocumentViewModel>(
+                shell.OpenAsset(csListAsset));
+            Assert.Single(csListVm.Entries);
+            Assert.Equal("Road1L\tCrossSections/Road1L.xml", csListVm.LiveTsvPreview.Value);
+
+            // Add new CrossSection entry + verify default CrossSectionDocument creation & Undo/Redo
+            csListVm.AddEntryCommand.Execute(Unit.Default);
+            Assert.Equal(2, csListVm.Entries.Count);
+            string addedKey = csListVm.SelectedRow.Value!.Key;
+            Assert.True(project.CrossSections.ContainsKey(addedKey));
+            Assert.Equal($"{addedKey}\tCrossSections/{addedKey}.xml", csListVm.LiveTsvPreview.Value);
+
+            // Open 2D CrossSectionEditor directly from list
+            csListVm.OpenCrossSectionEditorCommand.Execute(Unit.Default);
+            CrossSectionEditorDocumentViewModel openedCsVm = Assert.IsType<CrossSectionEditorDocumentViewModel>(
+                shell.DockFactory.DocumentDock!.ActiveDockable);
+            Assert.Equal(addedKey, openedCsVm.CrossSectionKey);
+
+            // Rename key & check re-keying in project.CrossSections + LiveTsvPreview
+            csListVm.EntryKey.Value = "CustomCurb";
+            Assert.True(project.CrossSections.ContainsKey("CustomCurb"));
+            Assert.False(project.CrossSections.ContainsKey(addedKey));
+            Assert.Equal($"CustomCurb\tCrossSections/{addedKey}.xml", csListVm.LiveTsvPreview.Value);
+
+            // Duplicate entry
+            csListVm.DuplicateEntryCommand.Execute(Unit.Default);
+            Assert.Equal(3, csListVm.Entries.Count);
+            Assert.Equal("CustomCurb_Copy", csListVm.Entries[2].Key);
+            Assert.True(project.CrossSections.ContainsKey("CustomCurb_Copy"));
+
+            // MoveUp + Undo
+            csListVm.SelectedRow.Value = csListVm.Entries[2];
+            csListVm.MoveUpCommand.Execute(Unit.Default);
+            Assert.Equal("CustomCurb_Copy", project.CrossSectionLists["CrossSections.txt"].Entries[1].Key);
+            shell.UndoCommand.Execute(Unit.Default);
+            Assert.Equal("CustomCurb_Copy", project.CrossSectionLists["CrossSections.txt"].Entries[2].Key);
+
+            // Create an extra list via Tab 4 & delete with Undo
+            shell.AssetBrowserTool.SelectedTabIndex.Value = 4;
+            shell.AssetBrowserTool.NewResourceKey.Value = "CrossSections_Extra";
+            shell.AssetBrowserTool.CreateActiveResourceCommand.Execute(Unit.Default);
+            Assert.Equal(2, project.CrossSectionLists.Count);
+            Assert.Equal(2, shell.AssetBrowserTool.CrossSectionListItems.Count);
+
+            AssetBrowserEntry extraEntry = Assert.Single(
+                shell.AssetBrowserTool.CrossSectionListItems,
+                i => i.RelativePath == "CrossSections_Extra.txt");
+            shell.AssetBrowserTool.SelectedItem.Value = extraEntry;
+            Assert.True(shell.AssetBrowserTool.CanDeleteSelected.Value);
+            shell.AssetBrowserTool.DeleteSelectedCommand.Execute(Unit.Default);
+            Assert.Single(project.CrossSectionLists);
+
+            shell.UndoCommand.Execute(Unit.Default);
+            Assert.Equal(2, project.CrossSectionLists.Count);
+
+            // Save & Reload
+            shell.SaveAllCommand.Execute(Unit.Default);
+            WorldProjectLoadResult reloaded = WorldProjectStorage.Load(project.WorldInfoFilePath);
+            Assert.DoesNotContain(reloaded.Diagnostics, static d => d.Severity == Serialization.Diagnostics.DiagnosticSeverity.Error);
+            Assert.True(reloaded.Project.CrossSections.ContainsKey("CustomCurb"));
+            Assert.True(reloaded.Project.CrossSections.ContainsKey("CustomCurb_Copy"));
+        }
+        finally
+        {
+            DeleteTempDirectory(tempDir);
+        }
+    }
+
+    [Fact]
+    public void AvaloniaUi_CrossSectionListEditorView_PreservesFocusAndMeasuresCleanly()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string tempDir = CreateTempDirectory();
+        try
+        {
+            AvaloniaUiTestHost.Run(() =>
+            {
+                using MainWindowViewModel shell = new();
+                WorldProject project = shell.CreateAndActivateWorld(tempDir, "Author", "CsUiWorld", "CsUi", "");
+
+                CrossSectionListEditorDocumentViewModel? csListVm = shell.OpenDefaultCrossSectionList();
+                Assert.NotNull(csListVm);
+                CrossSectionListRowViewModel? initialRow = csListVm!.SelectedRow.Value;
+                Assert.NotNull(initialRow);
+
+                CrossSectionListEditorView view = new()
+                {
+                    DataContext = csListVm,
+                };
+
+                Window host = new()
+                {
+                    Width = 960,
+                    Height = 640,
+                    ShowInTaskbar = false,
+                    Opacity = 0,
+                    Position = new PixelPoint(-20000, -20000),
+                    Content = view,
+                };
+
+                host.Show();
+                Dispatcher.UIThread.RunJobs();
+
+                view.Measure(new Size(960, 640));
+                view.Arrange(new Rect(0, 0, 960, 640));
+                Dispatcher.UIThread.RunJobs();
+
+                TextBox? entryKeyBox = view.GetVisualDescendants()
+                    .OfType<TextBox>()
+                    .FirstOrDefault(tb => tb.Text == csListVm.EntryKey.Value);
+                Assert.NotNull(entryKeyBox);
+
+                entryKeyBox!.Focus();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(entryKeyBox.IsFocused);
+
+                entryKeyBox.Text = "A";
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(entryKeyBox.IsFocused);
+
+                entryKeyBox.Text = "A ";
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(entryKeyBox.IsFocused);
+                Assert.Equal("A ", entryKeyBox.Text);
+
+                entryKeyBox.Text = "A Road";
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(entryKeyBox.IsFocused);
+                Assert.Same(initialRow, csListVm.SelectedRow.Value);
+                Assert.Equal("A Road", project.CrossSectionLists["CrossSections.txt"].Entries[0].Key);
+                Assert.Equal("A Road\tCrossSections/Road1L.xml", csListVm.LiveTsvPreview.Value);
+
+                host.Close();
+            });
         }
         finally
         {

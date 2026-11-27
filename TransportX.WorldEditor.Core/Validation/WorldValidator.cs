@@ -21,6 +21,7 @@ public static class WorldValidator
         List<ValidationIssue> issues = new List<ValidationIssue>();
 
         ValidateModelLists(project, issues);
+        ValidateCrossSectionLists(project, issues);
         ValidateCrossSections(project, issues);
         ValidateJunctionTemplates(project, issues);
         ValidateSplineTemplates(project, issues);
@@ -57,6 +58,43 @@ public static class WorldValidator
                         ValidationSeverity.Warning,
                         "MODEL_COLLISION_PATH_UPPERCASE",
                         $"モデル '{entry.Key}' の衝突モデルパス '{entry.Collider.CollisionModelPath}' に大文字が含まれています。TransportX 本体は実行時に第3列を小文字化するため、環境により一致しない可能性があります。",
+                        list.RelativePath));
+                }
+            }
+        }
+    }
+
+    private static void ValidateCrossSectionLists(WorldProject project, IList<ValidationIssue> issues)
+    {
+        HashSet<string> usedKeys = new(StringComparer.Ordinal);
+        foreach (CrossSectionListDocument list in project.CrossSectionLists.Values)
+        {
+            for (int i = 0; i < list.Entries.Count; i++)
+            {
+                CrossSectionListEntry entry = list.Entries[i];
+                if (string.IsNullOrWhiteSpace(entry.Key))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error,
+                        "CROSS_SECTION_LIST_EMPTY_KEY",
+                        $"断面リスト '{list.RelativePath}' の {i + 1} 行目で断面キーが空です。",
+                        list.RelativePath));
+                }
+                else if (!usedKeys.Add(entry.Key))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error,
+                        "CROSS_SECTION_LIST_DUPLICATE_KEY",
+                        $"断面リスト '{list.RelativePath}' の断面キー '{entry.Key}' が重複しています。",
+                        list.RelativePath));
+                }
+
+                if (string.IsNullOrWhiteSpace(entry.RelativePath))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error,
+                        "CROSS_SECTION_LIST_EMPTY_PATH",
+                        $"断面リスト '{list.RelativePath}' の '{entry.Key}' で XML パスが空です。",
                         list.RelativePath));
                 }
             }

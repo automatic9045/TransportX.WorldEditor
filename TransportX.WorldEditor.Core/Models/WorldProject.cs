@@ -26,6 +26,7 @@ public sealed class WorldProject
 
     public Dictionary<string, ModelListDocument> ModelLists { get; } = new Dictionary<string, ModelListDocument>(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, SoundListDocument> SoundLists { get; } = new Dictionary<string, SoundListDocument>(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, CrossSectionListDocument> CrossSectionLists { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, LaneLayoutDocument> LaneLayouts { get; } = new Dictionary<string, LaneLayoutDocument>(StringComparer.Ordinal);
     public Dictionary<string, CrossSectionDocument> CrossSections { get; } = new Dictionary<string, CrossSectionDocument>(StringComparer.Ordinal);
     public Dictionary<string, EnvironmentProfileDocument> Environments { get; } = new Dictionary<string, EnvironmentProfileDocument>(StringComparer.OrdinalIgnoreCase);

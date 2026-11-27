@@ -25,6 +25,7 @@ public sealed class ViewLocator : IDataTemplate
             WorldSettingsDocumentViewModel => new WorldSettingsView(),
             ModelListEditorDocumentViewModel => new ModelListEditorView(),
             SoundListEditorDocumentViewModel => new SoundListEditorView(),
+            CrossSectionListEditorDocumentViewModel => new CrossSectionListEditorView(),
             EnvironmentEditorDocumentViewModel => new EnvironmentEditorView(),
             LaneLayoutEditorDocumentViewModel => new LaneLayoutEditorView(),
             CrossSectionEditorDocumentViewModel => new CrossSectionEditorView(),
@@ -45,6 +46,7 @@ public sealed class ViewLocator : IDataTemplate
             || data is WorldSettingsDocumentViewModel
             || data is ModelListEditorDocumentViewModel
             || data is SoundListEditorDocumentViewModel
+            || data is CrossSectionListEditorDocumentViewModel
             || data is EnvironmentEditorDocumentViewModel
             || data is LaneLayoutEditorDocumentViewModel
             || data is CrossSectionEditorDocumentViewModel

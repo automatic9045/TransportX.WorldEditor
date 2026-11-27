@@ -21,24 +21,40 @@ public sealed class CanonicalCsxSerializersTests
         };
         doc.ModelLists.Add(new AssetListLoadReference(null, "Models.txt"));
         doc.SoundLists.Add(new AssetListLoadReference("se", "Sounds.txt"));
-        doc.CrossSections.Add(new ResourceLoadReference("Road1L", "CrossSections/Road1L.xml"));
+        doc.CrossSectionLists.Add("CrossSections.txt");
         doc.LaneTraffic.Types.Add(new LaneTrafficTypeDefinition("Pedestrians", "歩行者", "#FFFF00"));
         doc.LaneTraffic.Types.Add(new LaneTrafficTypeDefinition("Buses", "バス", "#00FF00"));
         doc.LaneTraffic.Groups.Add(new LaneTrafficGroupDefinition("Cars", ["Buses"], "#00FFFF"));
         doc.LaneLayouts.Add(new ResourceLoadReference("Layout1", "LaneLayouts/Layout1.xml"));
 
         string csx = InitCsxSerializer.Generate(doc);
+        Assert.Contains("CrossSections.LoadList(\"CrossSections.txt\");", csx, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("CrossSections.Load(", csx, System.StringComparison.Ordinal);
+
         (InitDocument? parsed, IReadOnlyList<ParseDiagnostic> diag) = InitCsxSerializer.Parse("Init.csx", csx);
 
         Assert.Empty(diag);
         Assert.NotNull(parsed);
         Assert.Single(parsed!.ModelLists);
         Assert.Equal("se", parsed.SoundLists[0].BundleKey);
-        Assert.Single(parsed.CrossSections);
+        Assert.Single(parsed.CrossSectionLists);
+        Assert.Equal("CrossSections.txt", parsed.CrossSectionLists[0]);
         Assert.Equal(2, parsed.LaneTraffic.Types.Count);
         Assert.Single(parsed.LaneTraffic.Groups);
         Assert.Single(parsed.LaneLayouts);
         Assert.Equal(doc.UserCode, parsed.UserCode);
+
+        string legacyInitCsx = """
+            #load "__Editor.csx"
+            {
+                // <editor-generated version="1">
+                CrossSections.Load("Road1L", "CrossSections/Road1L.xml");
+                // </editor-generated>
+            }
+            """;
+        (InitDocument? legacyParsed, IReadOnlyList<ParseDiagnostic> legacyDiag) = InitCsxSerializer.Parse("Init.csx", legacyInitCsx);
+        Assert.Null(legacyParsed);
+        Assert.NotEmpty(legacyDiag);
     }
 
     [Fact]

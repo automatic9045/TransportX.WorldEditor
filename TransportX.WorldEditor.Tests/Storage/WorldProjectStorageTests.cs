@@ -43,6 +43,14 @@ public sealed class WorldProjectStorageTests
         soundList.Entries.Add(new SoundListEntry("Bell", "Sounds/Bell.wav"));
         project.SoundLists["Sounds.txt"] = soundList;
 
+        CrossSectionListDocument csList = new() { RelativePath = "CrossSections.txt" };
+        csList.Entries.Add(new CrossSectionListEntry("Road1L", "CrossSections/Road1L.xml"));
+        project.CrossSectionLists["CrossSections.txt"] = csList;
+
+        CrossSectionListDocument subCsList = new() { RelativePath = "CrossSections/SubList.txt" };
+        subCsList.Entries.Add(new CrossSectionListEntry("SubCurb", "SubCurb.xml"));
+        project.CrossSectionLists["CrossSections/SubList.txt"] = subCsList;
+
         LaneLayoutDocument layout = new LaneLayoutDocument { Key = "Layout1", RelativePath = "LaneLayouts/Layout1.xml" };
         layout.Lanes.Add(new LaneDefinition("Cars", LaneFlowDirections.Out, -2f, -0.12f, 2f, 2f));
         layout.Lanes.Add(new LaneDefinition("Cars", LaneFlowDirections.In, 2f, -0.12f, 2f, 2f));
@@ -59,13 +67,24 @@ public sealed class WorldProjectStorageTests
         cs.Surfaces.Add(surf);
         project.CrossSections[cs.Key] = cs;
 
+        CrossSectionDocument subCs = new() { Key = "SubCurb", RelativePath = "CrossSections/SubCurb.xml" };
+        subCs.Vertices.Add(new CrossSectionVertexModel { Key = "A", X = 0f, Y = 0f });
+        subCs.Vertices.Add(new CrossSectionVertexModel { Key = "B", X = 1f, Y = 0f });
+        subCs.Materials.Add(new CrossSectionMaterialModel { Name = "Curb" });
+        CrossSectionSurfaceModel subSurf = new() { MaterialName = "Curb" };
+        subSurf.VertexKeys.Add("A");
+        subSurf.VertexKeys.Add("B");
+        subCs.Surfaces.Add(subSurf);
+        project.CrossSections[subCs.Key] = subCs;
+
         EnvironmentProfileDocument env = new EnvironmentProfileDocument { RelativePath = "Environment1.xml" };
         env.Ibl.Intensity = 1.25f;
         project.Environments["Environment1.xml"] = env;
 
         project.Init.ModelLists.Add(new AssetListLoadReference(null, "Models.txt"));
         project.Init.SoundLists.Add(new AssetListLoadReference(null, "Sounds.txt"));
-        project.Init.CrossSections.Add(new ResourceLoadReference("Road1L", "CrossSections/Road1L.xml"));
+        project.Init.CrossSectionLists.Add("CrossSections.txt");
+        project.Init.CrossSectionLists.Add("CrossSections/SubList.txt");
         project.Init.LaneTraffic.Types.Add(new LaneTrafficTypeDefinition("Cars", "自動車", "#00FFFF"));
         project.Init.LaneLayouts.Add(new ResourceLoadReference("Layout1", "LaneLayouts/Layout1.xml"));
 
@@ -157,6 +176,10 @@ public sealed class WorldProjectStorageTests
             WorldProjectLoadResult loaded = WorldProjectStorage.Load(original.WorldInfoFilePath);
             Assert.DoesNotContain(loaded.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
             Assert.Empty(loaded.Project.ProtectedFiles);
+            Assert.Equal(2, loaded.Project.CrossSectionLists.Count);
+            Assert.True(loaded.Project.CrossSections.ContainsKey("Road1L"));
+            Assert.True(loaded.Project.CrossSections.ContainsKey("SubCurb"));
+            Assert.Equal("CrossSections/SubCurb.xml", loaded.Project.CrossSections["SubCurb"].RelativePath);
 
             IReadOnlyList<ValidationIssue> issues = WorldValidator.Validate(loaded.Project);
             Assert.DoesNotContain(issues, i => i.Severity == ValidationSeverity.Error);

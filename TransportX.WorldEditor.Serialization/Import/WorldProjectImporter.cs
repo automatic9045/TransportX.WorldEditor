@@ -4,10 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using TransportX.WorldEditor.Core.Models;
+using TransportX.WorldEditor.Core.Models.Assets;
 using TransportX.WorldEditor.Core.Models.Environment;
 using TransportX.WorldEditor.Core.Models.Init;
 using TransportX.WorldEditor.Serialization.Csx;
 using TransportX.WorldEditor.Serialization.Diagnostics;
+using TransportX.WorldEditor.Serialization.Lists;
 using TransportX.WorldEditor.Serialization.Storage;
 using TransportX.WorldEditor.Serialization.Xml;
 
@@ -215,6 +217,15 @@ public static class WorldProjectImporter
             Directory.CreateDirectory(destWorldDir);
         }
 
+        if (0 < engine.LegacyLoadedCrossSections.Count)
+        {
+            WriteGeneratedCrossSectionListFromLegacyLoads(
+                project,
+                engine.LegacyLoadedCrossSections,
+                sourceWorldDir,
+                destWorldDir);
+        }
+
         // Load Init resource models/cross-sections/layouts from destination directory when present
         List<ParseDiagnostic> resourceLoadDiag = new();
         WorldProjectStorage.LoadInitResources(project, destWorldDir, resourceLoadDiag);
@@ -389,12 +400,12 @@ public static class WorldProjectImporter
             }
         }
 
-        for (int i = 0; i < project.Init.CrossSections.Count; i++)
+        for (int i = 0; i < project.Init.CrossSectionLists.Count; i++)
         {
-            ResourceLoadReference item = project.Init.CrossSections[i];
-            if (TryRebaseSinglePath(item.RelativePath, sourceWorldDir, destWorldDir, out string rebased))
+            string listPath = project.Init.CrossSectionLists[i];
+            if (TryRebaseSinglePath(listPath, sourceWorldDir, destWorldDir, out string rebased))
             {
-                project.Init.CrossSections[i] = item with { RelativePath = rebased };
+                project.Init.CrossSectionLists[i] = rebased;
             }
         }
 
@@ -406,6 +417,45 @@ public static class WorldProjectImporter
                 project.Init.LaneLayouts[i] = item with { RelativePath = rebased };
             }
         }
+    }
+
+    private static void WriteGeneratedCrossSectionListFromLegacyLoads(
+        WorldProject project,
+        IReadOnlyList<CrossSectionListEntry> entries,
+        string sourceWorldDir,
+        string destWorldDir)
+    {
+        string listRelPath = ResolveUniqueCrossSectionListPath(project, destWorldDir);
+        CrossSectionListDocument listDoc = new()
+        {
+            RelativePath = listRelPath,
+        };
+
+        foreach (CrossSectionListEntry entry in entries)
+        {
+            string entryRelPath = TryRebaseSinglePath(entry.RelativePath, sourceWorldDir, destWorldDir, out string rebased)
+                ? rebased
+                : entry.RelativePath;
+            listDoc.Entries.Add(new CrossSectionListEntry(entry.Key, entryRelPath));
+        }
+
+        project.Init.CrossSectionLists.Add(listRelPath);
+        string listFullPath = Path.Combine(destWorldDir, listRelPath);
+        WorldProjectStorage.WriteUtf8File(listFullPath, CrossSectionListSerializer.Generate(listDoc));
+    }
+
+    private static string ResolveUniqueCrossSectionListPath(WorldProject project, string destWorldDir)
+    {
+        string candidate = "CrossSections.txt";
+        int suffix = 1;
+        while (project.Init.CrossSectionLists.Any(p => string.Equals(WorldProject.NormalizeRelativePath(p), candidate, StringComparison.OrdinalIgnoreCase))
+            || File.Exists(Path.Combine(destWorldDir, candidate)))
+        {
+            candidate = suffix == 1 ? "CrossSections_Imported.txt" : $"CrossSections_Imported{suffix}.txt";
+            suffix++;
+        }
+
+        return candidate;
     }
 
     private static bool TryRebaseSinglePath(

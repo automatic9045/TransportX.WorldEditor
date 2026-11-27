@@ -102,6 +102,13 @@ public static class InitCsxSerializer
         ArgumentNullException.ThrowIfNull(doc);
 
         doc.RelativePath = relativePath;
+        doc.ModelLists.Clear();
+        doc.SoundLists.Clear();
+        doc.CrossSectionLists.Clear();
+        doc.LaneTraffic.Types.Clear();
+        doc.LaneTraffic.Groups.Clear();
+        doc.LaneLayouts.Clear();
+
         SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceText);
         SyntaxNode root = tree.GetRoot();
 
@@ -139,17 +146,15 @@ public static class InitCsxSerializer
             sb.Append(RoslynCsxHelpers.FormatStringLiteral(list.RelativePath)).Append(");\n");
         }
 
-        if (0 < document.CrossSections.Count && 0 < sb.Length)
+        if (0 < document.CrossSectionLists.Count && 0 < sb.Length)
         {
             sb.Append('\n');
         }
 
-        foreach (ResourceLoadReference cs in document.CrossSections)
+        foreach (string csListPath in document.CrossSectionLists)
         {
-            sb.Append("    CrossSections.Load(")
-                .Append(RoslynCsxHelpers.FormatStringLiteral(cs.Key))
-                .Append(", ")
-                .Append(RoslynCsxHelpers.FormatStringLiteral(cs.RelativePath))
+            sb.Append("    CrossSections.LoadList(")
+                .Append(RoslynCsxHelpers.FormatStringLiteral(csListPath))
                 .Append(");\n");
         }
 
@@ -241,11 +246,10 @@ public static class InitCsxSerializer
             return true;
         }
 
-        if (receiverPath == "CrossSections" && methodName == "Load" && args.Count == 2
-            && RoslynCsxHelpers.TryGetString(args[0].Expression, out string csKey)
-            && RoslynCsxHelpers.TryGetString(args[1].Expression, out string csPath))
+        if (receiverPath == "CrossSections" && methodName == "LoadList" && args.Count == 1
+            && RoslynCsxHelpers.TryGetString(args[0].Expression, out string csListPath))
         {
-            doc.CrossSections.Add(new ResourceLoadReference(csKey, csPath));
+            doc.CrossSectionLists.Add(csListPath);
             return true;
         }
 

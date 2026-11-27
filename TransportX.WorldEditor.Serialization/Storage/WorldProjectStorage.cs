@@ -288,6 +288,8 @@ public static class WorldProjectStorage
                 m => string.Equals(WorldProject.NormalizeRelativePath(m.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase)),
             WorldFileKind.SoundsTxt => project.SoundLists.Values.Any(
                 s => string.Equals(WorldProject.NormalizeRelativePath(s.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase)),
+            WorldFileKind.CrossSectionsTxt => project.CrossSectionLists.Values.Any(
+                c => string.Equals(WorldProject.NormalizeRelativePath(c.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase)),
             WorldFileKind.LaneLayoutXml => project.LaneLayouts.Values.Any(
                 l => string.Equals(WorldProject.NormalizeRelativePath(l.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase)),
             WorldFileKind.CrossSectionXml => project.CrossSections.Values.Any(
@@ -340,6 +342,11 @@ public static class WorldProjectStorage
             foreach (SoundListDocument soundList in project.SoundLists.Values)
             {
                 list.Add(new WorldFileTarget(WorldFileKind.SoundsTxt, WorldProject.NormalizeRelativePath(soundList.RelativePath)));
+            }
+
+            foreach (CrossSectionListDocument csList in project.CrossSectionLists.Values)
+            {
+                list.Add(new WorldFileTarget(WorldFileKind.CrossSectionsTxt, WorldProject.NormalizeRelativePath(csList.RelativePath)));
             }
 
             foreach (LaneLayoutDocument layout in project.LaneLayouts.Values)
@@ -439,6 +446,18 @@ public static class WorldProjectStorage
 
                 fullPathWritten = Path.Combine(project.WorldDirectory, normalizedRel);
                 WriteUtf8File(fullPathWritten, SoundListSerializer.Generate(soundList));
+                return true;
+
+            case WorldFileKind.CrossSectionsTxt:
+                CrossSectionListDocument? csList = project.CrossSectionLists.Values.FirstOrDefault(
+                    c => string.Equals(WorldProject.NormalizeRelativePath(c.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase));
+                if (csList is null)
+                {
+                    return false;
+                }
+
+                fullPathWritten = Path.Combine(project.WorldDirectory, normalizedRel);
+                WriteUtf8File(fullPathWritten, CrossSectionListSerializer.Generate(csList));
                 return true;
 
             case WorldFileKind.LaneLayoutXml:
@@ -794,6 +813,18 @@ public static class WorldProjectStorage
                 }
                 break;
 
+            case WorldFileKind.CrossSectionsTxt:
+                (CrossSectionListDocument? nextCrossSectionList, IReadOnlyList<ParseDiagnostic> csListDiag) =
+                    CrossSectionListSerializer.Parse(normalizedRel, normalizedFull, content);
+                diagnostics.AddRange(csListDiag);
+                if (nextCrossSectionList is not null)
+                {
+                    string storeKey = existingDictKey ?? normalizedRel;
+                    project.CrossSectionLists[storeKey] = nextCrossSectionList;
+                    SyncCrossSectionsFromListsOnReload(project, diagnostics);
+                }
+                break;
+
             case WorldFileKind.EnvironmentXml:
                 (EnvironmentProfileDocument? nextEnv, IReadOnlyList<ParseDiagnostic> envDiag) = EnvironmentProfileXmlSerializer.Parse(normalizedRel, normalizedFull, content);
                 diagnostics.AddRange(envDiag);
@@ -947,6 +978,16 @@ public static class WorldProjectStorage
             }
         }
 
+        foreach (KeyValuePair<string, CrossSectionListDocument> kv in project.CrossSectionLists)
+        {
+            if (string.Equals(WorldProject.NormalizeRelativePath(kv.Value.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase))
+            {
+                kind = WorldFileKind.CrossSectionsTxt;
+                existingDictKey = kv.Key;
+                return true;
+            }
+        }
+
         foreach (KeyValuePair<string, EnvironmentProfileDocument> kv in project.Environments)
         {
             if (string.Equals(WorldProject.NormalizeRelativePath(kv.Value.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase))
@@ -1058,22 +1099,23 @@ public static class WorldProjectStorage
             }
         }
 
-        foreach (ResourceLoadReference csRef in project.Init.CrossSections)
+        foreach (string csListPath in project.Init.CrossSectionLists)
         {
-            string fullPath = Path.GetFullPath(Path.Combine(initDir, csRef.RelativePath));
+            string fullPath = Path.GetFullPath(Path.Combine(initDir, csListPath));
             string worldRel = WorldProject.NormalizeRelativePath(Path.GetRelativePath(project.WorldDirectory, fullPath));
             if (!File.Exists(fullPath))
             {
-                diagnostics.Add(new ParseDiagnostic(DiagnosticSeverity.Error, fullPath, 1, 1, $"CrossSection ファイル '{fullPath}' が見つかりません。"));
+                diagnostics.Add(new ParseDiagnostic(DiagnosticSeverity.Error, fullPath, 1, 1, $"断面リスト '{fullPath}' が見つかりません。"));
                 continue;
             }
 
-            string xml = File.ReadAllText(fullPath, Encoding.UTF8);
-            (CrossSectionDocument? csDoc, IReadOnlyList<ParseDiagnostic> diag) = CrossSectionXmlSerializer.Parse(csRef.Key, worldRel, fullPath, xml);
+            string text = File.ReadAllText(fullPath, Encoding.UTF8);
+            (CrossSectionListDocument? listDoc, IReadOnlyList<ParseDiagnostic> diag) = CrossSectionListSerializer.Parse(worldRel, fullPath, text);
             diagnostics.AddRange(diag);
-            if (csDoc is not null)
+            if (listDoc is not null)
             {
-                project.CrossSections[csDoc.Key] = csDoc;
+                project.CrossSectionLists[worldRel] = listDoc;
+                LoadCrossSectionsFromList(project, listDoc, diagnostics);
             }
         }
 
@@ -1093,6 +1135,108 @@ public static class WorldProjectStorage
             if (llDoc is not null)
             {
                 project.LaneLayouts[llDoc.Key] = llDoc;
+            }
+        }
+    }
+
+    public static string GetListDirectory(string worldDirectory, string listRelativePath)
+    {
+        ArgumentNullException.ThrowIfNull(worldDirectory);
+        ArgumentNullException.ThrowIfNull(listRelativePath);
+
+        string listFullPath = Path.GetFullPath(Path.Combine(worldDirectory, WorldProject.NormalizeRelativePath(listRelativePath)));
+        return Path.GetDirectoryName(listFullPath) ?? Path.GetFullPath(worldDirectory);
+    }
+
+    internal static void LoadCrossSectionsFromList(
+        WorldProject project,
+        CrossSectionListDocument listDoc,
+        List<ParseDiagnostic> diagnostics)
+    {
+        string listDir = GetListDirectory(project.WorldDirectory, listDoc.RelativePath);
+        foreach (CrossSectionListEntry entry in listDoc.Entries)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Key) || string.IsNullOrWhiteSpace(entry.RelativePath))
+            {
+                continue;
+            }
+
+            string xmlFullPath = Path.GetFullPath(Path.Combine(listDir, entry.RelativePath));
+            string xmlWorldRel = WorldProject.NormalizeRelativePath(Path.GetRelativePath(project.WorldDirectory, xmlFullPath));
+            if (!File.Exists(xmlFullPath))
+            {
+                diagnostics.Add(new ParseDiagnostic(DiagnosticSeverity.Error, xmlFullPath, 1, 1, $"CrossSection ファイル '{xmlFullPath}' が見つかりません。"));
+                continue;
+            }
+
+            string xml = File.ReadAllText(xmlFullPath, Encoding.UTF8);
+            (CrossSectionDocument? csDoc, IReadOnlyList<ParseDiagnostic> csDiag) = CrossSectionXmlSerializer.Parse(entry.Key, xmlWorldRel, xmlFullPath, xml);
+            diagnostics.AddRange(csDiag);
+            if (csDoc is not null)
+            {
+                project.CrossSections[csDoc.Key] = csDoc;
+            }
+        }
+    }
+
+    private static void SyncCrossSectionsFromListsOnReload(WorldProject project, List<ParseDiagnostic> diagnostics)
+    {
+        HashSet<string> activeKeys = new(StringComparer.Ordinal);
+        foreach (CrossSectionListDocument listDoc in project.CrossSectionLists.Values)
+        {
+            foreach (CrossSectionListEntry entry in listDoc.Entries)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.Key))
+                {
+                    activeKeys.Add(entry.Key);
+                }
+            }
+        }
+
+        List<string> staleKeys = new();
+        foreach (KeyValuePair<string, CrossSectionDocument> kv in project.CrossSections)
+        {
+            if (!activeKeys.Contains(kv.Key) && !IsFileDirty(project, WorldFileKind.CrossSectionXml, kv.Value.RelativePath))
+            {
+                staleKeys.Add(kv.Key);
+            }
+        }
+
+        foreach (string staleKey in staleKeys)
+        {
+            project.CrossSections.Remove(staleKey);
+        }
+
+        foreach (CrossSectionListDocument listDoc in project.CrossSectionLists.Values)
+        {
+            string listDir = GetListDirectory(project.WorldDirectory, listDoc.RelativePath);
+            foreach (CrossSectionListEntry entry in listDoc.Entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key) || string.IsNullOrWhiteSpace(entry.RelativePath))
+                {
+                    continue;
+                }
+
+                string xmlFullPath = Path.GetFullPath(Path.Combine(listDir, entry.RelativePath));
+                string xmlWorldRel = WorldProject.NormalizeRelativePath(Path.GetRelativePath(project.WorldDirectory, xmlFullPath));
+                if (IsFileDirty(project, WorldFileKind.CrossSectionXml, xmlWorldRel))
+                {
+                    continue;
+                }
+
+                if (!File.Exists(xmlFullPath))
+                {
+                    diagnostics.Add(new ParseDiagnostic(DiagnosticSeverity.Error, xmlFullPath, 1, 1, $"CrossSection ファイル '{xmlFullPath}' が見つかりません。"));
+                    continue;
+                }
+
+                string xml = File.ReadAllText(xmlFullPath, Encoding.UTF8);
+                (CrossSectionDocument? csDoc, IReadOnlyList<ParseDiagnostic> csDiag) = CrossSectionXmlSerializer.Parse(entry.Key, xmlWorldRel, xmlFullPath, xml);
+                diagnostics.AddRange(csDiag);
+                if (csDoc is not null)
+                {
+                    project.CrossSections[csDoc.Key] = csDoc;
+                }
             }
         }
     }
@@ -1180,6 +1324,7 @@ public static class WorldProjectStorage
         }
 
         return content.Contains("Models.LoadList", StringComparison.Ordinal)
+            || content.Contains("CrossSections.LoadList", StringComparison.Ordinal)
             || content.Contains("Network.LaneLayouts.Load", StringComparison.Ordinal)
             || content.Contains("Network.LaneTraffic.", StringComparison.Ordinal);
     }

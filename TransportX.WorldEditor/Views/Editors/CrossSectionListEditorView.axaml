@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TransportX.WorldEditor.ViewModels.Editors"
+             x:Class="TransportX.WorldEditor.Views.Editors.CrossSectionListEditorView"
+             x:DataType="vm:CrossSectionListEditorDocumentViewModel">
+    <Grid ColumnDefinitions="1.1*,5,1.1*" Margin="10">
+        <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto" RowSpacing="8" Margin="0,0,6,0" MinWidth="260">
+            <WrapPanel Grid.Row="0" Orientation="Horizontal">
+                <Button Content="+ 断面追加" Margin="0,0,6,4" Command="{Binding AddEntryCommand}" />
+                <Button Content="既存 XML を追加..." Margin="0,0,6,4" Command="{Binding ImportXmlEntriesCommand}" />
+                <Button Content="複製" Margin="0,0,6,4" Command="{Binding DuplicateEntryCommand}" />
+                <Button Content="上へ" Margin="0,0,6,4" Command="{Binding MoveUpCommand}" />
+                <Button Content="下へ" Margin="0,0,6,4" Command="{Binding MoveDownCommand}" />
+                <Button Content="削除" Margin="0,0,0,4" Command="{Binding RemoveEntryCommand}" />
+            </WrapPanel>
+
+            <Border Grid.Row="1" BorderBrush="#313744" BorderThickness="1" CornerRadius="4" Background="#1D2028">
+                <Grid>
+                    <ListBox x:Name="EntriesListBox"
+                             ItemsSource="{Binding Entries}"
+                             SelectedItem="{Binding SelectedRow.Value, Mode=TwoWay}"
+                             DoubleTapped="OnEntriesListDoubleTapped">
+                        <ListBox.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="断面エディタで開く" Command="{Binding OpenCrossSectionEditorCommand}" />
+                                <MenuItem Header="複製" Command="{Binding DuplicateEntryCommand}" />
+                                <Separator />
+                                <MenuItem Header="削除" Command="{Binding RemoveEntryCommand}" />
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CrossSectionListRowViewModel">
+                                <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding Key}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding RelativePath}"
+                                               Foreground="#A8B3C5"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding StatusText}"
+                                               Foreground="{Binding StatusBrush}"
+                                               FontSize="11"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="断面エントリがありません。&#x0a;「+ 断面追加」または「既存 XML を追加...」から登録してください。"
+                               IsVisible="{Binding HasNoEntries.Value}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               Foreground="#94A0B4"
+                               IsHitTestVisible="False" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="2" Background="#181A20" BorderBrush="#2D313A" BorderThickness="1" CornerRadius="4" Padding="8">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="生成 TSV 行プレビュー:" FontSize="11" Foreground="#98A3B5" />
+                    <TextBlock Text="{Binding LiveTsvPreview.Value}"
+                               FontFamily="Consolas, Meiryo"
+                               FontSize="12"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Column="1" Width="5" ResizeDirection="Columns" Background="Transparent" />
+
+        <ScrollViewer Grid.Column="2" Margin="6,0,0,0" IsEnabled="{Binding HasSelection.Value}">
+            <Border Background="#20242C"
+                    BorderBrush="#313744"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="14"
+                    VerticalAlignment="Top">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="断面エントリ詳細" FontSize="15" FontWeight="SemiBold" />
+
+                    <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="断面キー" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EntryKey.Value, Mode=TwoWay}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="断面 XML パス (リスト相対)" />
+                        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <TextBox Grid.Column="0" Text="{Binding EntryPath.Value, Mode=TwoWay}" />
+                            <Button Grid.Column="1" Content="参照..." Command="{Binding BrowseXmlPathCommand}" />
+                        </Grid>
+                    </Grid>
+
+                    <Border Background="#55441A" CornerRadius="4" Padding="8" IsVisible="{Binding HasKeyWarning.Value}">
+                        <TextBlock Text="{Binding KeyWarningText.Value}"
+                                   Foreground="#FFE6A8"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                    </Border>
+
+                    <Border Background="#181A20" BorderBrush="#2D313A" BorderThickness="1" CornerRadius="4" Padding="10">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="プロジェクト相対パス:" FontSize="11" Foreground="#98A3B5" />
+                            <TextBlock Text="{Binding ResolvedWorldPathText.Value}" FontFamily="Consolas, Meiryo" FontSize="12" TextWrapping="Wrap" />
+                            <TextBlock Text="断面データ状態:" FontSize="11" Foreground="#98A3B5" Margin="0,4,0,0" />
+                            <TextBlock Text="{Binding DocumentSummaryText.Value}" Foreground="#CBD5E1" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="断面エディタで開く"
+                                Command="{Binding OpenCrossSectionEditorCommand}"
+                                Padding="12,6" />
+                        <TextBlock Text="※ 左の一覧をダブルクリックしても開けます"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   Foreground="#94A0B4" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

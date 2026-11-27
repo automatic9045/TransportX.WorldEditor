@@ -114,4 +114,23 @@ public sealed class AssetListSerializersTests
         Assert.Empty(rtDiag);
         Assert.Equal(doc.Entries, rt!.Entries);
     }
+
+    [Fact]
+    public void CrossSectionListRoundTripsWithCommentsIgnoredAndReportsInvalidColumns()
+    {
+        string tsv = "# header comment\nRoad1L\tCrossSections/Road1L.xml\t# inline comment\nCurb\tCrossSections/Curb.xml\n";
+        (CrossSectionListDocument? doc, IReadOnlyList<ParseDiagnostic> diag) = CrossSectionListSerializer.Parse("CrossSections.txt", "CrossSections.txt", tsv);
+        Assert.Empty(diag);
+        Assert.Equal(2, doc!.Entries.Count);
+        Assert.Equal("CrossSections/Road1L.xml", doc.Entries[0].RelativePath);
+        Assert.Equal("Curb\tCrossSections/Curb.xml", CrossSectionListSerializer.FormatEntryLine(doc.Entries[1]));
+
+        string generated = CrossSectionListSerializer.Generate(doc);
+        (CrossSectionListDocument? rt, IReadOnlyList<ParseDiagnostic> rtDiag) = CrossSectionListSerializer.Parse("CrossSections.txt", "rt.txt", generated);
+        Assert.Empty(rtDiag);
+        Assert.Equal(doc.Entries, rt!.Entries);
+
+        (CrossSectionListDocument? _, IReadOnlyList<ParseDiagnostic> badDiag) = CrossSectionListSerializer.Parse("CrossSections.txt", "bad.txt", "OnlyOneColumn\n");
+        Assert.NotEmpty(badDiag);
+    }
 }

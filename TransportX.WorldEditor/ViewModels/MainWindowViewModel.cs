@@ -113,6 +113,7 @@ public sealed class MainWindowViewModel : IDisposable
     public ReactiveCommand<Unit> OpenWorldSettingsCommand { get; }
     public ReactiveCommand<Unit> OpenModelListCommand { get; }
     public ReactiveCommand<Unit> OpenSoundListCommand { get; }
+    public ReactiveCommand<Unit> OpenCrossSectionListCommand { get; }
     public ReactiveCommand<Unit> OpenEnvironmentCommand { get; }
     public ReactiveCommand<Unit> UndoCommand { get; }
     public ReactiveCommand<Unit> RedoCommand { get; }
@@ -203,6 +204,7 @@ public sealed class MainWindowViewModel : IDisposable
         OpenWorldSettingsCommand = new ReactiveCommand<Unit>(u => { _ = OpenWorldSettings(); }).AddTo(Disposables);
         OpenModelListCommand = new ReactiveCommand<Unit>(u => { _ = OpenDefaultModelList(); }).AddTo(Disposables);
         OpenSoundListCommand = new ReactiveCommand<Unit>(u => { _ = OpenDefaultSoundList(); }).AddTo(Disposables);
+        OpenCrossSectionListCommand = new ReactiveCommand<Unit>(u => { _ = OpenDefaultCrossSectionList(); }).AddTo(Disposables);
         OpenEnvironmentCommand = new ReactiveCommand<Unit>(u => { _ = OpenDefaultEnvironment(); }).AddTo(Disposables);
         UndoCommand = new ReactiveCommand<Unit>(_ => Workspace.Undo()).AddTo(Disposables);
         RedoCommand = new ReactiveCommand<Unit>(_ => Workspace.Redo()).AddTo(Disposables);
@@ -578,6 +580,62 @@ public sealed class MainWindowViewModel : IDisposable
             () => new SoundListEditorDocumentViewModel(Workspace, DialogService, normalizedRel));
     }
 
+    public CrossSectionListEditorDocumentViewModel? OpenDefaultCrossSectionList()
+    {
+        WorldProject? project = Workspace.CurrentProject.Value;
+        if (project is null)
+        {
+            return null;
+        }
+
+        CrossSectionListDocument? doc = project.CrossSectionLists.Values.FirstOrDefault();
+        if (doc is null)
+        {
+            if (Workspace.AddNewCrossSectionList("CrossSections.txt"))
+            {
+                doc = project.CrossSectionLists.Values.FirstOrDefault();
+            }
+            else
+            {
+                Workspace.LastStatusMessage.Value = "このワールドには断面リスト (CrossSections.LoadList) が定義されておらず、Init.csx は上書き保護されています。";
+                return null;
+            }
+        }
+
+        if (doc is null)
+        {
+            return null;
+        }
+
+        string normalizedRel = WorldProject.NormalizeRelativePath(doc.RelativePath);
+        return DockFactory.OpenOrActivateDocument(
+            $"Doc_CrossSections_{normalizedRel}",
+            () => CreateCrossSectionListEditor(normalizedRel));
+    }
+
+    public CrossSectionEditorDocumentViewModel? OpenCrossSectionEditor(string crossSectionKey)
+    {
+        WorldProject? project = Workspace.CurrentProject.Value;
+        if (project is null || string.IsNullOrWhiteSpace(crossSectionKey) || !project.CrossSections.ContainsKey(crossSectionKey))
+        {
+            return null;
+        }
+
+        return DockFactory.OpenOrActivateDocument(
+            $"Doc_CrossSection_{crossSectionKey}",
+            () => new CrossSectionEditorDocumentViewModel(Workspace, DialogService, crossSectionKey));
+    }
+
+    private CrossSectionListEditorDocumentViewModel CreateCrossSectionListEditor(string normalizedRel)
+    {
+        return new CrossSectionListEditorDocumentViewModel(
+            Workspace,
+            DialogService,
+            normalizedRel,
+            key => _ = OpenCrossSectionEditor(key),
+            key => DockFactory.CloseDocumentById($"Doc_CrossSection_{key}"));
+    }
+
     public EnvironmentEditorDocumentViewModel? OpenDefaultEnvironment()
     {
         WorldProject? project = Workspace.CurrentProject.Value;
@@ -623,6 +681,11 @@ public sealed class MainWindowViewModel : IDisposable
                     $"Doc_Sounds_{normalizedRel}",
                     () => new SoundListEditorDocumentViewModel(Workspace, DialogService, normalizedRel));
 
+            case AssetBrowserItemKind.CrossSectionList:
+                return DockFactory.OpenOrActivateDocument(
+                    $"Doc_CrossSections_{normalizedRel}",
+                    () => CreateCrossSectionListEditor(normalizedRel));
+
             case AssetBrowserItemKind.Environment:
                 return DockFactory.OpenOrActivateDocument(
                     $"Doc_Env_{normalizedRel}",
@@ -663,6 +726,7 @@ public sealed class MainWindowViewModel : IDisposable
             AssetBrowserItemKind.WorldSettings => "Doc_WorldSettings",
             AssetBrowserItemKind.ModelList => $"Doc_Models_{normalizedRel}",
             AssetBrowserItemKind.SoundList => $"Doc_Sounds_{normalizedRel}",
+            AssetBrowserItemKind.CrossSectionList => $"Doc_CrossSections_{normalizedRel}",
             AssetBrowserItemKind.Environment => $"Doc_Env_{normalizedRel}",
             AssetBrowserItemKind.LaneLayout => $"Doc_LaneLayout_{entry.Key}",
             AssetBrowserItemKind.CrossSection => $"Doc_CrossSection_{entry.Key}",
@@ -674,6 +738,31 @@ public sealed class MainWindowViewModel : IDisposable
         if (docId is not null)
         {
             DockFactory.CloseDocumentById(docId);
+        }
+
+        if (entry.Kind == AssetBrowserItemKind.CrossSectionList)
+        {
+            CloseOrphanedCrossSectionEditors();
+        }
+    }
+
+    private void CloseOrphanedCrossSectionEditors()
+    {
+        WorldProject? project = Workspace.CurrentProject.Value;
+        if (project is null || DockFactory.DocumentDock?.VisibleDockables is null)
+        {
+            return;
+        }
+
+        List<CrossSectionEditorDocumentViewModel> openCrossSections = DockFactory.DocumentDock.VisibleDockables
+            .OfType<CrossSectionEditorDocumentViewModel>()
+            .ToList();
+        foreach (CrossSectionEditorDocumentViewModel csDoc in openCrossSections)
+        {
+            if (!project.CrossSections.ContainsKey(csDoc.CrossSectionKey) && !string.IsNullOrEmpty(csDoc.Id))
+            {
+                DockFactory.CloseDocumentById(csDoc.Id);
+            }
         }
     }
 

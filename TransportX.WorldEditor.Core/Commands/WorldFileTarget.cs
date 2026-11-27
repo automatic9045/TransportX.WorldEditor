@@ -14,6 +14,7 @@ public enum WorldFileKind
     JunctionTemplateCsx,
     ModelsTxt,
     SoundsTxt,
+    CrossSectionsTxt,
     LaneLayoutXml,
     CrossSectionXml,
     EnvironmentXml,

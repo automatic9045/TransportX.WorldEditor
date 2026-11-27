@@ -347,6 +347,10 @@ public sealed class WorldWorkspaceService : IDisposable
         LaneLayoutDocument layout1 = CreateDefaultSymmetricLayout("Layout1", "LaneLayouts/Layout1.xml");
         project.LaneLayouts[layout1.Key] = layout1;
 
+        CrossSectionListDocument crossSectionList = new() { RelativePath = "CrossSections.txt" };
+        crossSectionList.Entries.Add(new CrossSectionListEntry("Road1L", "CrossSections/Road1L.xml"));
+        project.CrossSectionLists["CrossSections.txt"] = crossSectionList;
+
         CrossSectionDocument road1L = CreateDefaultRoadCrossSection("Road1L", "CrossSections/Road1L.xml");
         project.CrossSections[road1L.Key] = road1L;
 
@@ -355,7 +359,7 @@ public sealed class WorldWorkspaceService : IDisposable
 
         project.Init.ModelLists.Add(new AssetListLoadReference(null, "Models.txt"));
         project.Init.SoundLists.Add(new AssetListLoadReference(null, "Sounds.txt"));
-        project.Init.CrossSections.Add(new ResourceLoadReference("Road1L", "CrossSections/Road1L.xml"));
+        project.Init.CrossSectionLists.Add("CrossSections.txt");
         project.Init.LaneTraffic.Types.Add(new LaneTrafficTypeDefinition("Pedestrians", "歩行者", "#FFFF00"));
         project.Init.LaneTraffic.Types.Add(new LaneTrafficTypeDefinition("Buses", "バス", "#00FF00"));
         project.Init.LaneTraffic.Types.Add(new LaneTrafficTypeDefinition("NormalCars", "その他自動車", "#0000FF"));
@@ -2833,6 +2837,11 @@ public sealed class WorldWorkspaceService : IDisposable
             return WorldFileKind.SoundsTxt;
         }
 
+        if (project.CrossSectionLists.Values.Any(c => string.Equals(WorldProject.NormalizeRelativePath(c.RelativePath), normalizedRel, StringComparison.OrdinalIgnoreCase)))
+        {
+            return WorldFileKind.CrossSectionsTxt;
+        }
+
         return WorldFileKind.WorldCsx;
     }
 
@@ -3134,14 +3143,35 @@ public sealed class WorldWorkspaceService : IDisposable
         }
 
         string normalizedRel = WorldProject.NormalizeRelativePath(relativePath);
-        CrossSectionDocument doc = CreateDefaultRoadCrossSection(key, normalizedRel);
-        ResourceLoadReference initRef = new ResourceLoadReference(key, normalizedRel);
-
-        IReadOnlyList<WorldFileTarget> targets = new WorldFileTarget[]
+        CrossSectionListDocument? targetList = project.CrossSectionLists.Values.FirstOrDefault();
+        bool createDefaultList = targetList is null;
+        string normalizedInit = WorldProject.NormalizeRelativePath(project.Init.RelativePath);
+        if (createDefaultList && project.IsProtected(normalizedInit))
         {
-            new WorldFileTarget(WorldFileKind.CrossSectionXml, normalizedRel),
-            new WorldFileTarget(WorldFileKind.InitCsx, WorldProject.NormalizeRelativePath(project.Init.RelativePath)),
-        };
+            LastStatusMessage.Value = "Init.csx が上書き保護されているため、CrossSections.txt を追加できません。";
+            return false;
+        }
+
+        string listRel = targetList is not null
+            ? WorldProject.NormalizeRelativePath(targetList.RelativePath)
+            : "CrossSections.txt";
+        CrossSectionListDocument listToUse = targetList ?? new CrossSectionListDocument { RelativePath = listRel };
+        string listDir = WorldProjectStorage.GetListDirectory(project.WorldDirectory, listRel);
+        string xmlFullPath = Path.GetFullPath(Path.Combine(project.WorldDirectory, normalizedRel));
+        string entryRel = Path.GetRelativePath(listDir, xmlFullPath).Replace('\\', '/');
+
+        CrossSectionDocument doc = CreateDefaultRoadCrossSection(key, normalizedRel);
+        CrossSectionListEntry listEntry = new(key, entryRel);
+
+        List<WorldFileTarget> targets =
+        [
+            new(WorldFileKind.CrossSectionXml, normalizedRel),
+            new(WorldFileKind.CrossSectionsTxt, listRel),
+        ];
+        if (createDefaultList)
+        {
+            targets.Add(new WorldFileTarget(WorldFileKind.InitCsx, normalizedInit));
+        }
 
         Execute(new DelegateEditorCommand(
             $"CrossSection '{key}' を追加",
@@ -3149,13 +3179,195 @@ public sealed class WorldWorkspaceService : IDisposable
             targets,
             () =>
             {
+                if (createDefaultList)
+                {
+                    project.CrossSectionLists[listRel] = listToUse;
+                    project.Init.CrossSectionLists.Add(listRel);
+                }
+
+                listToUse.Entries.Add(listEntry);
                 project.CrossSections[key] = doc;
-                project.Init.CrossSections.Add(initRef);
             },
             () =>
             {
                 project.CrossSections.Remove(key);
-                project.Init.CrossSections.Remove(initRef);
+                listToUse.Entries.Remove(listEntry);
+                if (createDefaultList)
+                {
+                    project.CrossSectionLists.Remove(listRel);
+                    project.Init.CrossSectionLists.Remove(listRel);
+                }
+            }));
+
+        return true;
+    }
+
+    public CrossSectionDocument CreateDefaultCrossSectionDocument(string key, string worldRelativePath)
+    {
+        return CreateDefaultRoadCrossSection(key, WorldProject.NormalizeRelativePath(worldRelativePath));
+    }
+
+    public bool EnsureCrossSectionDocument(string listRelativePath, string key, string entryRelativePath)
+    {
+        WorldProject? project = CurrentProject.Value;
+        if (project is null || string.IsNullOrWhiteSpace(key))
+        {
+            return false;
+        }
+
+        if (project.CrossSections.ContainsKey(key))
+        {
+            return true;
+        }
+
+        string listDir = WorldProjectStorage.GetListDirectory(project.WorldDirectory, listRelativePath);
+        string xmlFullPath = Path.GetFullPath(Path.Combine(listDir, entryRelativePath));
+        string xmlWorldRel = WorldProject.NormalizeRelativePath(Path.GetRelativePath(project.WorldDirectory, xmlFullPath));
+        if (File.Exists(xmlFullPath))
+        {
+            string xml = File.ReadAllText(xmlFullPath, Encoding.UTF8);
+            (CrossSectionDocument? loadedDoc, IReadOnlyList<ParseDiagnostic> diag) = CrossSectionXmlSerializer.Parse(key, xmlWorldRel, xmlFullPath, xml);
+            if (loadedDoc is null)
+            {
+                ParseDiagnostics.Value = diag;
+                LastStatusMessage.Value = $"CrossSection '{Path.GetFileName(xmlFullPath)}' の解析に失敗しました。";
+                return false;
+            }
+
+            project.CrossSections[key] = loadedDoc;
+            return true;
+        }
+
+        CrossSectionDocument newDoc = CreateDefaultRoadCrossSection(key, xmlWorldRel);
+        WorldFileTarget target = new(WorldFileKind.CrossSectionXml, xmlWorldRel);
+        Execute(new DelegateEditorCommand(
+            $"CrossSection '{key}' の XML を新規作成",
+            InvalidationScope.FullRebuild,
+            target,
+            () => project.CrossSections[key] = newDoc,
+            () => project.CrossSections.Remove(key)));
+        return true;
+    }
+
+    public bool TryCopyOrResolveExternalCrossSectionXml(
+        string sourceFilePath,
+        string listRelativePath,
+        string? desiredKey,
+        out string entryRelativePath,
+        out string worldRelativePath,
+        out CrossSectionDocument? parsedDoc,
+        out string resolvedKey)
+    {
+        entryRelativePath = string.Empty;
+        worldRelativePath = string.Empty;
+        parsedDoc = null;
+        resolvedKey = string.Empty;
+
+        WorldProject? project = CurrentProject.Value;
+        if (project is null)
+        {
+            return false;
+        }
+
+        if (!TryResolveImportTarget(
+                project,
+                sourceFilePath,
+                "CrossSections",
+                _ => false,
+                out string destFullPath,
+                out string normalizedWorldRel))
+        {
+            return false;
+        }
+
+        string key = ResolveUniqueResourceKey(
+            desiredKey,
+            Path.GetFileNameWithoutExtension(destFullPath),
+            k => project.CrossSections.ContainsKey(k));
+
+        string xml = File.ReadAllText(destFullPath, Encoding.UTF8);
+        (CrossSectionDocument? doc, IReadOnlyList<ParseDiagnostic> diag) = CrossSectionXmlSerializer.Parse(key, normalizedWorldRel, destFullPath, xml);
+        if (doc is null)
+        {
+            ParseDiagnostics.Value = diag;
+            LastStatusMessage.Value = $"CrossSection '{Path.GetFileName(destFullPath)}' の解析に失敗しました。";
+            return false;
+        }
+
+        string listDir = WorldProjectStorage.GetListDirectory(project.WorldDirectory, listRelativePath);
+        entryRelativePath = Path.GetRelativePath(listDir, destFullPath).Replace('\\', '/');
+        worldRelativePath = normalizedWorldRel;
+        parsedDoc = doc;
+        resolvedKey = key;
+        return true;
+    }
+
+    public static bool IsCrossSectionKeyReferencedInOtherLists(
+        WorldProject project,
+        string key,
+        string? excludeListRelPath,
+        int excludeEntryIndex = -1)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        string? normExclude = excludeListRelPath is null ? null : WorldProject.NormalizeRelativePath(excludeListRelPath);
+
+        foreach (KeyValuePair<string, CrossSectionListDocument> kv in project.CrossSectionLists)
+        {
+            bool isExcludedList = normExclude is not null
+                && string.Equals(WorldProject.NormalizeRelativePath(kv.Key), normExclude, StringComparison.OrdinalIgnoreCase);
+
+            for (int i = 0; i < kv.Value.Entries.Count; i++)
+            {
+                if (isExcludedList && i == excludeEntryIndex)
+                {
+                    continue;
+                }
+
+                if (string.Equals(kv.Value.Entries[i].Key, key, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public bool AddNewCrossSectionList(string relativePath)
+    {
+        WorldProject? project = CurrentProject.Value;
+        string normalizedInit = project is null ? string.Empty : WorldProject.NormalizeRelativePath(project.Init.RelativePath);
+        if (project is null || project.IsProtected(normalizedInit))
+        {
+            return false;
+        }
+
+        string normalizedRel = WorldProject.NormalizeRelativePath(relativePath);
+        if (project.CrossSectionLists.ContainsKey(normalizedRel))
+        {
+            return false;
+        }
+
+        CrossSectionListDocument doc = new() { RelativePath = normalizedRel };
+        IReadOnlyList<WorldFileTarget> targets = new WorldFileTarget[]
+        {
+            new(WorldFileKind.CrossSectionsTxt, normalizedRel),
+            new(WorldFileKind.InitCsx, normalizedInit),
+        };
+
+        Execute(new DelegateEditorCommand(
+            $"断面リスト '{normalizedRel}' を追加",
+            InvalidationScope.FullRebuild,
+            targets,
+            () =>
+            {
+                project.CrossSectionLists[normalizedRel] = doc;
+                project.Init.CrossSectionLists.Add(normalizedRel);
+            },
+            () =>
+            {
+                project.CrossSectionLists.Remove(normalizedRel);
+                project.Init.CrossSectionLists.Remove(normalizedRel);
             }));
 
         return true;
@@ -3255,6 +3467,91 @@ public sealed class WorldWorkspaceService : IDisposable
             && RemoveInitAssetList(project, project.SoundLists, project.Init.SoundLists, relativePath, WorldFileKind.SoundsTxt, "サウンドリスト");
     }
 
+    public bool RemoveCrossSectionList(string relativePath)
+    {
+        WorldProject? project = CurrentProject.Value;
+        if (project is null)
+        {
+            return false;
+        }
+
+        string normalizedInit = WorldProject.NormalizeRelativePath(project.Init.RelativePath);
+        if (project.IsProtected(normalizedInit))
+        {
+            LastStatusMessage.Value = "Init.csx が上書き保護されているため、断面リストを削除できません。";
+            return false;
+        }
+
+        string normalizedRel = WorldProject.NormalizeRelativePath(relativePath);
+        if (!project.CrossSectionLists.TryGetValue(normalizedRel, out CrossSectionListDocument? existingDoc))
+        {
+            return false;
+        }
+
+        int refIndex = -1;
+        string? existingRef = null;
+        for (int i = 0; i < project.Init.CrossSectionLists.Count; i++)
+        {
+            if (string.Equals(WorldProject.NormalizeRelativePath(project.Init.CrossSectionLists[i]), normalizedRel, StringComparison.OrdinalIgnoreCase))
+            {
+                refIndex = i;
+                existingRef = project.Init.CrossSectionLists[i];
+                break;
+            }
+        }
+
+        Dictionary<string, CrossSectionDocument> orphanedSections = new(StringComparer.Ordinal);
+        foreach (CrossSectionListEntry entry in existingDoc.Entries)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.Key)
+                && !IsCrossSectionKeyReferencedInOtherLists(project, entry.Key, normalizedRel)
+                && project.CrossSections.TryGetValue(entry.Key, out CrossSectionDocument? csDoc))
+            {
+                orphanedSections[entry.Key] = csDoc;
+            }
+        }
+
+        IReadOnlyList<WorldFileTarget> targets = new WorldFileTarget[]
+        {
+            new(WorldFileKind.CrossSectionsTxt, normalizedRel),
+            new(WorldFileKind.InitCsx, normalizedInit),
+        };
+
+        Execute(new DelegateEditorCommand(
+            $"断面リスト '{normalizedRel}' を削除",
+            InvalidationScope.FullRebuild,
+            targets,
+            () =>
+            {
+                project.CrossSectionLists.Remove(normalizedRel);
+                if (existingRef is not null)
+                {
+                    project.Init.CrossSectionLists.Remove(existingRef);
+                }
+
+                foreach (string key in orphanedSections.Keys)
+                {
+                    project.CrossSections.Remove(key);
+                }
+            },
+            () =>
+            {
+                project.CrossSectionLists[normalizedRel] = existingDoc;
+                if (existingRef is not null)
+                {
+                    int insertAt = Math.Clamp(refIndex, 0, project.Init.CrossSectionLists.Count);
+                    project.Init.CrossSectionLists.Insert(insertAt, existingRef);
+                }
+
+                foreach (KeyValuePair<string, CrossSectionDocument> kv in orphanedSections)
+                {
+                    project.CrossSections[kv.Key] = kv.Value;
+                }
+            }));
+
+        return true;
+    }
+
     public bool RemoveLaneLayout(string key)
     {
         WorldProject? project = CurrentProject.Value;
@@ -3265,8 +3562,60 @@ public sealed class WorldWorkspaceService : IDisposable
     public bool RemoveCrossSection(string key)
     {
         WorldProject? project = CurrentProject.Value;
-        return project is not null
-            && RemoveInitResource(project, project.CrossSections, project.Init.CrossSections, key, WorldFileKind.CrossSectionXml, "CrossSection");
+        if (project is null || !project.CrossSections.TryGetValue(key, out CrossSectionDocument? existingDoc))
+        {
+            return false;
+        }
+
+        List<(CrossSectionListDocument List, int Index, CrossSectionListEntry Entry)> removedEntries = new();
+        List<WorldFileTarget> targets =
+        [
+            new(WorldFileKind.CrossSectionXml, WorldProject.NormalizeRelativePath(existingDoc.RelativePath)),
+        ];
+
+        foreach (CrossSectionListDocument listDoc in project.CrossSectionLists.Values)
+        {
+            for (int i = listDoc.Entries.Count - 1; 0 <= i; i--)
+            {
+                if (string.Equals(listDoc.Entries[i].Key, key, StringComparison.Ordinal))
+                {
+                    removedEntries.Add((listDoc, i, listDoc.Entries[i]));
+                    WorldFileTarget listTarget = new(WorldFileKind.CrossSectionsTxt, WorldProject.NormalizeRelativePath(listDoc.RelativePath));
+                    if (!targets.Contains(listTarget))
+                    {
+                        targets.Add(listTarget);
+                    }
+                }
+            }
+        }
+
+        Execute(new DelegateEditorCommand(
+            $"CrossSection '{key}' を削除",
+            InvalidationScope.FullRebuild,
+            targets,
+            () =>
+            {
+                project.CrossSections.Remove(key);
+                foreach ((CrossSectionListDocument listDoc, int idx, CrossSectionListEntry _) in removedEntries)
+                {
+                    if (0 <= idx && idx < listDoc.Entries.Count)
+                    {
+                        listDoc.Entries.RemoveAt(idx);
+                    }
+                }
+            },
+            () =>
+            {
+                project.CrossSections[key] = existingDoc;
+                for (int i = removedEntries.Count - 1; 0 <= i; i--)
+                {
+                    (CrossSectionListDocument listDoc, int idx, CrossSectionListEntry entry) = removedEntries[i];
+                    int insertAt = Math.Clamp(idx, 0, listDoc.Entries.Count);
+                    listDoc.Entries.Insert(insertAt, entry);
+                }
+            }));
+
+        return true;
     }
 
     public bool AddNewSplineTemplate(string key, string relativePath)
@@ -3721,6 +4070,101 @@ public sealed class WorldWorkspaceService : IDisposable
         return true;
     }
 
+    public bool ImportExistingCrossSectionList(string sourceFilePath, out string? registeredRelativePath)
+    {
+        registeredRelativePath = null;
+        WorldProject? project = CurrentProject.Value;
+        string normalizedInit = project is null ? string.Empty : WorldProject.NormalizeRelativePath(project.Init.RelativePath);
+        if (project is null || project.IsProtected(normalizedInit))
+        {
+            if (project is not null)
+            {
+                LastStatusMessage.Value = "Init.csx が上書き保護されているため、既存断面リストを読み込めません。";
+            }
+
+            return false;
+        }
+
+        if (!TryResolveImportTarget(
+                project,
+                sourceFilePath,
+                string.Empty,
+                rel => project.CrossSectionLists.ContainsKey(rel),
+                out string fullPath,
+                out string normalizedRel))
+        {
+            return false;
+        }
+
+        string text = File.ReadAllText(fullPath, Encoding.UTF8);
+        (CrossSectionListDocument? doc, IReadOnlyList<ParseDiagnostic> diag) = CrossSectionListSerializer.Parse(normalizedRel, fullPath, text);
+        if (doc is null)
+        {
+            ParseDiagnostics.Value = diag;
+            LastStatusMessage.Value = $"断面リスト '{Path.GetFileName(fullPath)}' の解析に失敗しました。";
+            return false;
+        }
+
+        string listDir = WorldProjectStorage.GetListDirectory(project.WorldDirectory, normalizedRel);
+        Dictionary<string, CrossSectionDocument> loadedSections = new(StringComparer.Ordinal);
+        foreach (CrossSectionListEntry entry in doc.Entries)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Key)
+                || string.IsNullOrWhiteSpace(entry.RelativePath)
+                || project.CrossSections.ContainsKey(entry.Key)
+                || loadedSections.ContainsKey(entry.Key))
+            {
+                continue;
+            }
+
+            string xmlFullPath = Path.GetFullPath(Path.Combine(listDir, entry.RelativePath));
+            if (!File.Exists(xmlFullPath))
+            {
+                continue;
+            }
+
+            string xmlWorldRel = WorldProject.NormalizeRelativePath(Path.GetRelativePath(project.WorldDirectory, xmlFullPath));
+            string xmlText = File.ReadAllText(xmlFullPath, Encoding.UTF8);
+            (CrossSectionDocument? csDoc, IReadOnlyList<ParseDiagnostic> csDiag) = CrossSectionXmlSerializer.Parse(entry.Key, xmlWorldRel, xmlFullPath, xmlText);
+            if (csDoc is not null)
+            {
+                loadedSections[entry.Key] = csDoc;
+            }
+        }
+
+        IReadOnlyList<WorldFileTarget> targets = new WorldFileTarget[]
+        {
+            new(WorldFileKind.CrossSectionsTxt, normalizedRel),
+            new(WorldFileKind.InitCsx, normalizedInit),
+        };
+
+        Execute(new DelegateEditorCommand(
+            $"既存断面リスト '{normalizedRel}' を追加",
+            InvalidationScope.FullRebuild,
+            targets,
+            () =>
+            {
+                project.CrossSectionLists[normalizedRel] = doc;
+                project.Init.CrossSectionLists.Add(normalizedRel);
+                foreach (KeyValuePair<string, CrossSectionDocument> kv in loadedSections)
+                {
+                    project.CrossSections[kv.Key] = kv.Value;
+                }
+            },
+            () =>
+            {
+                project.CrossSectionLists.Remove(normalizedRel);
+                project.Init.CrossSectionLists.Remove(normalizedRel);
+                foreach (string key in loadedSections.Keys)
+                {
+                    project.CrossSections.Remove(key);
+                }
+            }));
+
+        registeredRelativePath = normalizedRel;
+        return true;
+    }
+
     public bool ImportExistingLaneLayout(string sourceFilePath, string? desiredKey, out string? registeredKey, out string? registeredRelativePath)
     {
         registeredKey = null;
@@ -3795,13 +4239,16 @@ public sealed class WorldWorkspaceService : IDisposable
         registeredRelativePath = null;
         WorldProject? project = CurrentProject.Value;
         string normalizedInit = project is null ? string.Empty : WorldProject.NormalizeRelativePath(project.Init.RelativePath);
-        if (project is null || project.IsProtected(normalizedInit))
+        if (project is null)
         {
-            if (project is not null)
-            {
-                LastStatusMessage.Value = "Init.csx が上書き保護されているため、既存 CrossSection を読み込めません。";
-            }
+            return false;
+        }
 
+        CrossSectionListDocument? targetList = project.CrossSectionLists.Values.FirstOrDefault();
+        bool createDefaultList = targetList is null;
+        if (createDefaultList && project.IsProtected(normalizedInit))
+        {
+            LastStatusMessage.Value = "Init.csx が上書き保護されているため、既存 CrossSection を読み込めません。";
             return false;
         }
 
@@ -3830,12 +4277,23 @@ public sealed class WorldWorkspaceService : IDisposable
             return false;
         }
 
-        ResourceLoadReference initRef = new(key, normalizedRel);
-        IReadOnlyList<WorldFileTarget> targets = new WorldFileTarget[]
-        {
+        string listRel = targetList is not null
+            ? WorldProject.NormalizeRelativePath(targetList.RelativePath)
+            : "CrossSections.txt";
+        CrossSectionListDocument listToUse = targetList ?? new CrossSectionListDocument { RelativePath = listRel };
+        string listDir = WorldProjectStorage.GetListDirectory(project.WorldDirectory, listRel);
+        string entryRel = Path.GetRelativePath(listDir, fullPath).Replace('\\', '/');
+        CrossSectionListEntry listEntry = new(key, entryRel);
+
+        List<WorldFileTarget> targets =
+        [
             new(WorldFileKind.CrossSectionXml, normalizedRel),
-            new(WorldFileKind.InitCsx, normalizedInit),
-        };
+            new(WorldFileKind.CrossSectionsTxt, listRel),
+        ];
+        if (createDefaultList)
+        {
+            targets.Add(new WorldFileTarget(WorldFileKind.InitCsx, normalizedInit));
+        }
 
         Execute(new DelegateEditorCommand(
             $"既存 CrossSection '{key}' を追加",
@@ -3843,13 +4301,24 @@ public sealed class WorldWorkspaceService : IDisposable
             targets,
             () =>
             {
+                if (createDefaultList)
+                {
+                    project.CrossSectionLists[listRel] = listToUse;
+                    project.Init.CrossSectionLists.Add(listRel);
+                }
+
+                listToUse.Entries.Add(listEntry);
                 project.CrossSections[key] = doc;
-                project.Init.CrossSections.Add(initRef);
             },
             () =>
             {
                 project.CrossSections.Remove(key);
-                project.Init.CrossSections.Remove(initRef);
+                listToUse.Entries.Remove(listEntry);
+                if (createDefaultList)
+                {
+                    project.CrossSectionLists.Remove(listRel);
+                    project.Init.CrossSectionLists.Remove(listRel);
+                }
             }));
 
         registeredKey = key;
@@ -4623,6 +5092,11 @@ public sealed class WorldWorkspaceService : IDisposable
                 foreach (SoundListDocument s in project.SoundLists.Values)
                 {
                     paths.Add(Path.GetFullPath(Path.Combine(worldDir, WorldProject.NormalizeRelativePath(s.RelativePath))));
+                }
+
+                foreach (CrossSectionListDocument csList in project.CrossSectionLists.Values)
+                {
+                    paths.Add(Path.GetFullPath(Path.Combine(worldDir, WorldProject.NormalizeRelativePath(csList.RelativePath))));
                 }
 
                 foreach (LaneLayoutDocument l in project.LaneLayouts.Values)
